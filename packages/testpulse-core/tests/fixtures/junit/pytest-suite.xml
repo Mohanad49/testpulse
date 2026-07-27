@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="2" skipped="1" tests="9" time="0.067" timestamp="2026-07-28T01:59:19.267389+03:00" hostname="ci-runner-01"><testcase classname="test_sample_suite" name="test_login_succeeds" time="0.001" /><testcase classname="test_sample_suite" name="test_search_returns_results" time="0.001" /><testcase classname="test_sample_suite" name="test_cart_total_is_correct" time="0.001"><failure message="AssertionError: expected total 30 for 3 items at 10 each&#10;assert (10 * 3) == 31">def test_cart_total_is_correct():
+&gt;       assert 10 * 3 == 31, "expected total 30 for 3 items at 10 each"
+E       AssertionError: expected total 30 for 3 items at 10 each
+E       assert (10 * 3) == 31
+
+test_sample_suite.py:13: AssertionError</failure></testcase><testcase classname="test_sample_suite" name="test_export_to_csv" time="0.000"><skipped type="pytest.skip" message="feature behind a flag not enabled in CI">/repo/test_sample_suite.py:16: feature behind a flag not enabled in CI</skipped></testcase><testcase classname="test_sample_suite" name="test_reads_from_backend" time="0.001"><error message="failed on setup with &quot;RuntimeError: could not connect to fixture backend on port 5432&quot;">@pytest.fixture
+    def broken_backend():
+&gt;       raise RuntimeError("could not connect to fixture backend on port 5432")
+E       RuntimeError: could not connect to fixture backend on port 5432
+
+test_sample_suite.py:23: RuntimeError</error></testcase><testcase classname="test_sample_suite" name="test_timezone_offset[Africa/Cairo]" time="0.001" /><testcase classname="test_sample_suite" name="test_timezone_offset[Asia/Kathmandu]" time="0.001" /><testcase classname="test_sample_suite.TestCheckout" name="test_applies_discount" time="0.000" /><testcase classname="test_sample_suite.TestCheckout" name="test_rejects_expired_coupon" time="0.001"><failure message="AssertionError: expired coupon was accepted&#10;assert False">self = &lt;test_sample_suite.TestCheckout object at 0x1079c3920&gt;
+
+    def test_rejects_expired_coupon(self):
+&gt;       assert False, "expired coupon was accepted"
+E       AssertionError: expired coupon was accepted
+E       assert False
+
+test_sample_suite.py:40: AssertionError</failure></testcase></testsuite></testsuites>

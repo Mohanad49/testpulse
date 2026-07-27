@@ -1,0 +1,54 @@
+{
+ "name": "test_create_duplicate_repo_returns_422",
+ "status": "passed",
+ "description": "Creating a repo with the same name as an existing one returns 422.",
+ "start": 1780166750160,
+ "stop": 1780166750452,
+ "uuid": "12a08cc5-7017-4f10-a273-440433b02d20",
+ "historyId": "f28ac85ab023caffb19ca7054f473915",
+ "testCaseId": "f28ac85ab023caffb19ca7054f473915",
+ "fullName": "tests.test_repositories.TestRepositories#test_create_duplicate_repo_returns_422",
+ "labels": [
+  {
+   "name": "tag",
+   "value": "negative"
+  },
+  {
+   "name": "parentSuite",
+   "value": "tests"
+  },
+  {
+   "name": "suite",
+   "value": "test_repositories"
+  },
+  {
+   "name": "subSuite",
+   "value": "TestRepositories"
+  },
+  {
+   "name": "host",
+   "value": "ci-runner-01"
+  },
+  {
+   "name": "thread",
+   "value": "45069-MainThread"
+  },
+  {
+   "name": "framework",
+   "value": "pytest"
+  },
+  {
+   "name": "language",
+   "value": "cpython3"
+  },
+  {
+   "name": "package",
+   "value": "tests.test_repositories"
+  }
+ ],
+ "titlePath": [
+  "tests",
+  "test_repositories.py",
+  "TestRepositories"
+ ]
+}

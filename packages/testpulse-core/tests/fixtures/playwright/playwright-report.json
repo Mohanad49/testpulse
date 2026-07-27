@@ -1,0 +1,533 @@
+{
+ "config": {
+  "configFile": "/repo/playwright.config.ts",
+  "rootDir": "/repo/tests",
+  "forbidOnly": false,
+  "fullyParallel": false,
+  "globalSetup": null,
+  "globalTeardown": null,
+  "globalTimeout": 0,
+  "grep": {},
+  "grepInvert": null,
+  "maxFailures": 0,
+  "metadata": {
+   "actualWorkers": 1
+  },
+  "preserveOutput": "always",
+  "projects": [
+   {
+    "outputDir": "/repo/test-results",
+    "repeatEach": 1,
+    "retries": 2,
+    "metadata": {
+     "actualWorkers": 1
+    },
+    "id": "",
+    "name": "",
+    "testDir": "/repo/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 3000
+   }
+  ],
+  "quiet": false,
+  "reporter": [
+   [
+    "json",
+    {
+     "outputFile": "playwright-report.json"
+    }
+   ]
+  ],
+  "reportSlowTests": {
+   "max": 5,
+   "threshold": 300000
+  },
+  "shard": null,
+  "tags": [],
+  "updateSnapshots": "missing",
+  "updateSourceMethod": "patch",
+  "version": "1.60.0",
+  "workers": 6,
+  "webServer": null
+ },
+ "suites": [
+  {
+   "title": "booking.spec.ts",
+   "file": "booking.spec.ts",
+   "column": 0,
+   "line": 0,
+   "specs": [],
+   "suites": [
+    {
+     "title": "Booking flow",
+     "file": "booking.spec.ts",
+     "line": 3,
+     "column": 6,
+     "specs": [
+      {
+       "title": "creates a booking in the host timezone",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 3000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "workerIndex": 0,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 6,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-07-27T22:59:59.893Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "expected"
+        }
+       ],
+       "id": "a3a10f2351dcc49e1cb9-e02c63fa58e881b78077",
+       "file": "booking.spec.ts",
+       "line": 4,
+       "column": 7
+      },
+      {
+       "title": "rejects a booking outside availability",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 3000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "workerIndex": 0,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 1,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-07-27T22:59:59.937Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "expected"
+        }
+       ],
+       "id": "a3a10f2351dcc49e1cb9-3ac3fc8517aff8fe53a3",
+       "file": "booking.spec.ts",
+       "line": 8,
+       "column": 7
+      },
+      {
+       "title": "reschedules across a DST boundary",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 3000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "workerIndex": 0,
+           "parallelIndex": 0,
+           "status": "failed",
+           "duration": 3,
+           "error": {
+            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: > \u001b[32m0\u001b[39m\nReceived:   \u001b[31m0\u001b[39m",
+            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: > \u001b[32m0\u001b[39m\nReceived:   \u001b[31m0\u001b[39m\n    at /repo/tests/booking.spec.ts:16:21",
+            "location": {
+             "file": "/repo/tests/booking.spec.ts",
+             "column": 21,
+             "line": 16
+            },
+            "snippet": "  14 |     // fixture contains a genuine multi-attempt result for retry_count parsing.\n  15 |     const attempt = test.info().retry;\n> 16 |     expect(attempt).toBeGreaterThan(0);\n     |                     ^\n  17 |   });\n  18 |\n  19 |   test('double booking is rejected', async () => {"
+           },
+           "errors": [
+            {
+             "location": {
+              "file": "/repo/tests/booking.spec.ts",
+              "column": 21,
+              "line": 16
+             },
+             "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: > \u001b[32m0\u001b[39m\nReceived:   \u001b[31m0\u001b[39m\n\n  14 |     // fixture contains a genuine multi-attempt result for retry_count parsing.\n  15 |     const attempt = test.info().retry;\n> 16 |     expect(attempt).toBeGreaterThan(0);\n     |                     ^\n  17 |   });\n  18 |\n  19 |   test('double booking is rejected', async () => {\n    at /repo/tests/booking.spec.ts:16:21"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-07-27T22:59:59.949Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-reschedules-across-a-DST-boundary/error-context.md"
+            }
+           ],
+           "errorLocation": {
+            "file": "/repo/tests/booking.spec.ts",
+            "column": 21,
+            "line": 16
+           }
+          },
+          {
+           "workerIndex": 1,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 6,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 1,
+           "startTime": "2026-07-27T23:00:00.611Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "flaky"
+        }
+       ],
+       "id": "a3a10f2351dcc49e1cb9-baae8fd47016051e46be",
+       "file": "booking.spec.ts",
+       "line": 12,
+       "column": 7
+      },
+      {
+       "title": "double booking is rejected",
+       "ok": false,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 3000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "workerIndex": 1,
+           "parallelIndex": 0,
+           "status": "failed",
+           "duration": 6,
+           "error": {
+            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m",
+            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m\n    at /repo/tests/booking.spec.ts:20:42",
+            "location": {
+             "file": "/repo/tests/booking.spec.ts",
+             "column": 42,
+             "line": 20
+            },
+            "snippet": "  18 |\n  19 |   test('double booking is rejected', async () => {\n> 20 |     expect('expected slot to be locked').toBe('slot was released');\n     |                                          ^\n  21 |   });\n  22 |\n  23 |   test.skip('cancellation refunds the fee', async () => {"
+           },
+           "errors": [
+            {
+             "location": {
+              "file": "/repo/tests/booking.spec.ts",
+              "column": 42,
+              "line": 20
+             },
+             "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m\n\n  18 |\n  19 |   test('double booking is rejected', async () => {\n> 20 |     expect('expected slot to be locked').toBe('slot was released');\n     |                                          ^\n  21 |   });\n  22 |\n  23 |   test.skip('cancellation refunds the fee', async () => {\n    at /repo/tests/booking.spec.ts:20:42"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-07-27T23:00:00.654Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-double-booking-is-rejected/error-context.md"
+            }
+           ],
+           "errorLocation": {
+            "file": "/repo/tests/booking.spec.ts",
+            "column": 42,
+            "line": 20
+           }
+          },
+          {
+           "workerIndex": 2,
+           "parallelIndex": 0,
+           "status": "failed",
+           "duration": 11,
+           "error": {
+            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m",
+            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m\n    at /repo/tests/booking.spec.ts:20:42",
+            "location": {
+             "file": "/repo/tests/booking.spec.ts",
+             "column": 42,
+             "line": 20
+            },
+            "snippet": "  18 |\n  19 |   test('double booking is rejected', async () => {\n> 20 |     expect('expected slot to be locked').toBe('slot was released');\n     |                                          ^\n  21 |   });\n  22 |\n  23 |   test.skip('cancellation refunds the fee', async () => {"
+           },
+           "errors": [
+            {
+             "location": {
+              "file": "/repo/tests/booking.spec.ts",
+              "column": 42,
+              "line": 20
+             },
+             "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m\n\n  18 |\n  19 |   test('double booking is rejected', async () => {\n> 20 |     expect('expected slot to be locked').toBe('slot was released');\n     |                                          ^\n  21 |   });\n  22 |\n  23 |   test.skip('cancellation refunds the fee', async () => {\n    at /repo/tests/booking.spec.ts:20:42"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 1,
+           "startTime": "2026-07-27T23:00:01.308Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-double-booking-is-rejected-retry1/error-context.md"
+            }
+           ],
+           "errorLocation": {
+            "file": "/repo/tests/booking.spec.ts",
+            "column": 42,
+            "line": 20
+           }
+          },
+          {
+           "workerIndex": 3,
+           "parallelIndex": 0,
+           "status": "failed",
+           "duration": 10,
+           "error": {
+            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m",
+            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m\n    at /repo/tests/booking.spec.ts:20:42",
+            "location": {
+             "file": "/repo/tests/booking.spec.ts",
+             "column": 42,
+             "line": 20
+            },
+            "snippet": "  18 |\n  19 |   test('double booking is rejected', async () => {\n> 20 |     expect('expected slot to be locked').toBe('slot was released');\n     |                                          ^\n  21 |   });\n  22 |\n  23 |   test.skip('cancellation refunds the fee', async () => {"
+           },
+           "errors": [
+            {
+             "location": {
+              "file": "/repo/tests/booking.spec.ts",
+              "column": 42,
+              "line": 20
+             },
+             "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mslot was releas\u001b[27med\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mexpected slot to be lock\u001b[27med\"\u001b[39m\n\n  18 |\n  19 |   test('double booking is rejected', async () => {\n> 20 |     expect('expected slot to be locked').toBe('slot was released');\n     |                                          ^\n  21 |   });\n  22 |\n  23 |   test.skip('cancellation refunds the fee', async () => {\n    at /repo/tests/booking.spec.ts:20:42"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 2,
+           "startTime": "2026-07-27T23:00:01.981Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-double-booking-is-rejected-retry2/error-context.md"
+            }
+           ],
+           "errorLocation": {
+            "file": "/repo/tests/booking.spec.ts",
+            "column": 42,
+            "line": 20
+           }
+          }
+         ],
+         "status": "unexpected"
+        }
+       ],
+       "id": "a3a10f2351dcc49e1cb9-e25ef2cf5b8cdcb58277",
+       "file": "booking.spec.ts",
+       "line": 19,
+       "column": 7
+      },
+      {
+       "title": "cancellation refunds the fee",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 3000,
+         "annotations": [
+          {
+           "type": "skip",
+           "location": {
+            "file": "/repo/tests/booking.spec.ts",
+            "line": 23,
+            "column": 8
+           }
+          }
+         ],
+         "expectedStatus": "skipped",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "workerIndex": 4,
+           "parallelIndex": 0,
+           "status": "skipped",
+           "duration": 0,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-07-27T23:00:02.653Z",
+           "annotations": [
+            {
+             "type": "skip",
+             "location": {
+              "file": "/repo/tests/booking.spec.ts",
+              "line": 23,
+              "column": 8
+             }
+            }
+           ],
+           "attachments": []
+          }
+         ],
+         "status": "skipped"
+        }
+       ],
+       "id": "a3a10f2351dcc49e1cb9-6601a3ab9a6a28466ecb",
+       "file": "booking.spec.ts",
+       "line": 23,
+       "column": 8
+      },
+      {
+       "title": "availability lookup completes in time",
+       "ok": false,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 3000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "",
+         "projectName": "",
+         "results": [
+          {
+           "workerIndex": 4,
+           "parallelIndex": 0,
+           "status": "timedOut",
+           "duration": 3003,
+           "error": {
+            "message": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m",
+            "stack": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m"
+           },
+           "errors": [
+            {
+             "message": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-07-27T23:00:02.654Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-availability-lookup-completes-in-time/error-context.md"
+            }
+           ]
+          },
+          {
+           "workerIndex": 5,
+           "parallelIndex": 0,
+           "status": "timedOut",
+           "duration": 3002,
+           "error": {
+            "message": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m",
+            "stack": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m"
+           },
+           "errors": [
+            {
+             "message": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 1,
+           "startTime": "2026-07-27T23:00:06.341Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-availability-lookup-completes-in-time-retry1/error-context.md"
+            }
+           ]
+          },
+          {
+           "workerIndex": 6,
+           "parallelIndex": 0,
+           "status": "timedOut",
+           "duration": 3004,
+           "error": {
+            "message": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m",
+            "stack": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m"
+           },
+           "errors": [
+            {
+             "message": "\u001b[31mTest timeout of 3000ms exceeded.\u001b[39m"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 2,
+           "startTime": "2026-07-27T23:00:10.023Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "/repo/test-results/booking-Booking-flow-availability-lookup-completes-in-time-retry2/error-context.md"
+            }
+           ]
+          }
+         ],
+         "status": "unexpected"
+        }
+       ],
+       "id": "a3a10f2351dcc49e1cb9-7258e0dbbc07618b73bc",
+       "file": "booking.spec.ts",
+       "line": 27,
+       "column": 7
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "errors": [],
+ "stats": {
+  "startTime": "2026-07-27T22:59:59.244Z",
+  "duration": 13846.612000000001,
+  "expected": 2,
+  "skipped": 1,
+  "unexpected": 2,
+  "flaky": 1
+ }
+}

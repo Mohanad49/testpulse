@@ -1,0 +1,339 @@
+{
+ "created": 1785193159.333826,
+ "duration": 0.06643104553222656,
+ "exitcode": 1,
+ "root": "/repo",
+ "environment": {},
+ "summary": {
+  "passed": 5,
+  "failed": 2,
+  "skipped": 1,
+  "error": 1,
+  "total": 9,
+  "collected": 9
+ },
+ "collectors": [
+  {
+   "nodeid": "",
+   "outcome": "passed",
+   "result": [
+    {
+     "nodeid": "test_sample_suite.py",
+     "type": "Module"
+    }
+   ]
+  },
+  {
+   "nodeid": "test_sample_suite.py::TestCheckout",
+   "outcome": "passed",
+   "result": [
+    {
+     "nodeid": "test_sample_suite.py::TestCheckout::test_applies_discount",
+     "type": "Function",
+     "lineno": 35
+    },
+    {
+     "nodeid": "test_sample_suite.py::TestCheckout::test_rejects_expired_coupon",
+     "type": "Function",
+     "lineno": 38
+    }
+   ]
+  },
+  {
+   "nodeid": "test_sample_suite.py",
+   "outcome": "passed",
+   "result": [
+    {
+     "nodeid": "test_sample_suite.py::test_login_succeeds",
+     "type": "Function",
+     "lineno": 3
+    },
+    {
+     "nodeid": "test_sample_suite.py::test_search_returns_results",
+     "type": "Function",
+     "lineno": 7
+    },
+    {
+     "nodeid": "test_sample_suite.py::test_cart_total_is_correct",
+     "type": "Function",
+     "lineno": 11
+    },
+    {
+     "nodeid": "test_sample_suite.py::test_export_to_csv",
+     "type": "Function",
+     "lineno": 15
+    },
+    {
+     "nodeid": "test_sample_suite.py::test_reads_from_backend",
+     "type": "Function",
+     "lineno": 25
+    },
+    {
+     "nodeid": "test_sample_suite.py::test_timezone_offset[Africa/Cairo]",
+     "type": "Function",
+     "lineno": 29
+    },
+    {
+     "nodeid": "test_sample_suite.py::test_timezone_offset[Asia/Kathmandu]",
+     "type": "Function",
+     "lineno": 29
+    },
+    {
+     "nodeid": "test_sample_suite.py::TestCheckout",
+     "type": "Class"
+    }
+   ]
+  }
+ ],
+ "tests": [
+  {
+   "nodeid": "test_sample_suite.py::test_login_succeeds",
+   "lineno": 3,
+   "outcome": "passed",
+   "keywords": [
+    "test_login_succeeds",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.0002655161079019308,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.00020120595581829548,
+    "outcome": "passed"
+   },
+   "teardown": {
+    "duration": 0.0002944099251180887,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::test_search_returns_results",
+   "lineno": 7,
+   "outcome": "passed",
+   "keywords": [
+    "test_search_returns_results",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00017713895067572594,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.00018247589468955994,
+    "outcome": "passed"
+   },
+   "teardown": {
+    "duration": 0.0001531420275568962,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::test_cart_total_is_correct",
+   "lineno": 11,
+   "outcome": "failed",
+   "keywords": [
+    "test_cart_total_is_correct",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00015760608948767185,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.00058520189486444,
+    "outcome": "failed",
+    "crash": {
+     "path": "/repo/test_sample_suite.py",
+     "lineno": 13,
+     "message": "AssertionError: expected total 30 for 3 items at 10 each\nassert (10 * 3) == 31"
+    },
+    "traceback": [
+     {
+      "path": "test_sample_suite.py",
+      "lineno": 13,
+      "message": "AssertionError"
+     }
+    ],
+    "longrepr": "def test_cart_total_is_correct():\n>       assert 10 * 3 == 31, \"expected total 30 for 3 items at 10 each\"\nE       AssertionError: expected total 30 for 3 items at 10 each\nE       assert (10 * 3) == 31\n\ntest_sample_suite.py:13: AssertionError"
+   },
+   "teardown": {
+    "duration": 0.00020469888113439083,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::test_export_to_csv",
+   "lineno": 15,
+   "outcome": "skipped",
+   "keywords": [
+    "test_export_to_csv",
+    "skip",
+    "pytestmark",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00018149917013943195,
+    "outcome": "skipped",
+    "longrepr": "('/repo/test_sample_suite.py', 16, 'Skipped: feature behind a flag not enabled in CI')"
+   },
+   "teardown": {
+    "duration": 0.00015047588385641575,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::test_reads_from_backend",
+   "lineno": 25,
+   "outcome": "error",
+   "keywords": [
+    "test_reads_from_backend",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00029645301401615143,
+    "outcome": "failed",
+    "crash": {
+     "path": "/repo/test_sample_suite.py",
+     "lineno": 23,
+     "message": "RuntimeError: could not connect to fixture backend on port 5432"
+    },
+    "traceback": [
+     {
+      "path": "test_sample_suite.py",
+      "lineno": 23,
+      "message": "RuntimeError"
+     }
+    ],
+    "longrepr": "@pytest.fixture\n    def broken_backend():\n>       raise RuntimeError(\"could not connect to fixture backend on port 5432\")\nE       RuntimeError: could not connect to fixture backend on port 5432\n\ntest_sample_suite.py:23: RuntimeError"
+   },
+   "teardown": {
+    "duration": 0.0002557961270213127,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::test_timezone_offset[Africa/Cairo]",
+   "lineno": 29,
+   "outcome": "passed",
+   "keywords": [
+    "test_timezone_offset[Africa/Cairo]",
+    "parametrize",
+    "pytestmark",
+    "Africa/Cairo",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00048596784472465515,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.0002657119184732437,
+    "outcome": "passed"
+   },
+   "teardown": {
+    "duration": 0.00018658116459846497,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::test_timezone_offset[Asia/Kathmandu]",
+   "lineno": 29,
+   "outcome": "passed",
+   "keywords": [
+    "test_timezone_offset[Asia/Kathmandu]",
+    "parametrize",
+    "pytestmark",
+    "Asia/Kathmandu",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00034101703204214573,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.00019163102842867374,
+    "outcome": "passed"
+   },
+   "teardown": {
+    "duration": 0.00021704286336898804,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::TestCheckout::test_applies_discount",
+   "lineno": 35,
+   "outcome": "passed",
+   "keywords": [
+    "test_applies_discount",
+    "TestCheckout",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00017194286920130253,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.00016697589308023453,
+    "outcome": "passed"
+   },
+   "teardown": {
+    "duration": 0.00014260108582675457,
+    "outcome": "passed"
+   }
+  },
+  {
+   "nodeid": "test_sample_suite.py::TestCheckout::test_rejects_expired_coupon",
+   "lineno": 38,
+   "outcome": "failed",
+   "keywords": [
+    "test_rejects_expired_coupon",
+    "TestCheckout",
+    "test_sample_suite.py",
+    "genfix",
+    ""
+   ],
+   "setup": {
+    "duration": 0.00014986307360231876,
+    "outcome": "passed"
+   },
+   "call": {
+    "duration": 0.00022433791309595108,
+    "outcome": "failed",
+    "crash": {
+     "path": "/repo/test_sample_suite.py",
+     "lineno": 40,
+     "message": "AssertionError: expired coupon was accepted\nassert False"
+    },
+    "traceback": [
+     {
+      "path": "test_sample_suite.py",
+      "lineno": 40,
+      "message": "AssertionError"
+     }
+    ],
+    "longrepr": "self = <test_sample_suite.TestCheckout object at 0x1079c3920>\n\n    def test_rejects_expired_coupon(self):\n>       assert False, \"expired coupon was accepted\"\nE       AssertionError: expired coupon was accepted\nE       assert False\n\ntest_sample_suite.py:40: AssertionError"
+   },
+   "teardown": {
+    "duration": 0.00016398215666413307,
+    "outcome": "passed"
+   }
+  }
+ ]
+}

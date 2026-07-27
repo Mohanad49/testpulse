@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="Restful Booker API Testing Framework" tests="17" time="4.122">
+  <testsuite name="00 Smoke Contract / Ping API availability" id="79546408-b10a-4f75-a198-e56f7d75658a" timestamp="2026-05-29T13:22:18.887Z" tests="2" failures="0" errors="0" time="0.405">
+    <testcase name="ping returns Created status" time="0.135" classname="00SmokeContractPingApiAvailability" />
+    <testcase name="response time is below configured SLA" time="0.135" classname="00SmokeContractPingApiAvailability" />
+  </testsuite>
+  <testsuite name="00 Smoke Contract / List booking IDs" id="67dbab8e-e876-45b9-992d-b2531cd3f7fb" timestamp="2026-05-29T13:22:18.887Z" tests="4" failures="0" errors="0" time="0.159">
+    <testcase name="booking list responds successfully" time="0.148" classname="00SmokeContractListBookingIDs" />
+    <testcase name="response body is an array" time="0.148" classname="00SmokeContractListBookingIDs" />
+    <testcase name="booking id contract is stable when records exist" time="0.148" classname="00SmokeContractListBookingIDs" />
+    <testcase name="response time is below configured SLA" time="0.148" classname="00SmokeContractListBookingIDs" />
+  </testsuite>
+  <testsuite name="01 Auth Contract / Create auth token" id="619c9620-7424-4772-b26f-db748aa90138" timestamp="2026-05-29T13:22:18.887Z" tests="4" failures="0" errors="0" time="0.136">
+    <testcase name="auth request succeeds" time="0.135" classname="01AuthContractCreateAuthToken" />
+    <testcase name="auth response contains token" time="0.135" classname="01AuthContractCreateAuthToken" />
+    <testcase name="token does not look like a placeholder" time="0.135" classname="01AuthContractCreateAuthToken" />
+    <testcase name="response time is below configured SLA" time="0.135" classname="01AuthContractCreateAuthToken" />
+  </testsuite>
+  <testsuite name="01 Auth Contract / Reject invalid credentials" id="4294e517-a807-4ea0-bf2f-dfe86447217e" timestamp="2026-05-29T13:22:18.887Z" tests="3" failures="0" errors="0" time="0.135">
+    <testcase name="invalid auth returns handled response" time="0.135" classname="01AuthContractRejectInvalidCredentials" />
+    <testcase name="invalid auth does not return a token" time="0.135" classname="01AuthContractRejectInvalidCredentials" />
+    <testcase name="response time is below configured SLA" time="0.135" classname="01AuthContractRejectInvalidCredentials" />
+  </testsuite>
+  <testsuite name="02 Booking CRUD Lifecycle / Create booking" id="899b2bc1-0f31-4b86-a2e4-5ff415c8651d" timestamp="2026-05-29T13:22:18.887Z" tests="4" failures="0" errors="0" time="0.136">
+    <testcase name="create booking succeeds" time="0.134" classname="02BookingCrudLifecycleCreateBooking" />
+    <testcase name="create response includes booking id and booking object" time="0.134" classname="02BookingCrudLifecycleCreateBooking" />
+    <testcase name="created booking echoes submitted guest data" time="0.134" classname="02BookingCrudLifecycleCreateBooking" />
+    <testcase name="response time is below configured SLA" time="0.134" classname="02BookingCrudLifecycleCreateBooking" />
+  </testsuite>
+</testsuites>

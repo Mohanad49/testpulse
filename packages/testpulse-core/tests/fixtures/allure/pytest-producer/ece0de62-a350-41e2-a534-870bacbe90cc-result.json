@@ -1,0 +1,58 @@
+{
+ "name": "test_delete_repo_returns_204",
+ "status": "failed",
+ "statusDetails": {
+  "message": "AssertionError: assert 403 == 204\n +  where 403 = <Response [403]>.status_code",
+  "trace": "self = <tests.test_repositories.TestRepositories object at 0x104ab0f50>, session = <requests.sessions.Session object at 0x104ac3150>\nbase_url = 'https://api.github.com'\nauthenticated_user = {'avatar_url': 'https://avatars.githubusercontent.com/u/134085492?v=4', 'bio': None, 'blog': '', 'collaborators': 1, ...}\n\n    @pytest.mark.regression\n    def test_delete_repo_returns_204(self, session, base_url, authenticated_user):\n        \"\"\"DELETE /repos/:owner/:repo returns 204 No Content.\"\"\"\n        import uuid\n    \n        repo_name = f\"test-delete-{uuid.uuid4().hex[:8]}\"\n        session.post(f\"{base_url}/user/repos\", json={\n            \"name\": repo_name, \"private\": True, \"auto_init\": True,\n        })\n        username = authenticated_user[\"login\"]\n        del_resp = session.delete(f\"{base_url}/repos/{username}/{repo_name}\")\n>       assert del_resp.status_code == 204\nE       assert 403 == 204\nE        +  where 403 = <Response [403]>.status_code\n\ntests/test_repositories.py:59: AssertionError"
+ },
+ "description": "DELETE /repos/:owner/:repo returns 204 No Content.",
+ "start": 1780166233776,
+ "stop": 1780166235852,
+ "uuid": "0d923d4f-dea0-4b75-b3a0-9a01548c72f4",
+ "historyId": "44b1d8f7220069d44fe4a64d0ae876e9",
+ "testCaseId": "44b1d8f7220069d44fe4a64d0ae876e9",
+ "fullName": "tests.test_repositories.TestRepositories#test_delete_repo_returns_204",
+ "labels": [
+  {
+   "name": "tag",
+   "value": "regression"
+  },
+  {
+   "name": "parentSuite",
+   "value": "tests"
+  },
+  {
+   "name": "suite",
+   "value": "test_repositories"
+  },
+  {
+   "name": "subSuite",
+   "value": "TestRepositories"
+  },
+  {
+   "name": "host",
+   "value": "ci-runner-01"
+  },
+  {
+   "name": "thread",
+   "value": "44858-MainThread"
+  },
+  {
+   "name": "framework",
+   "value": "pytest"
+  },
+  {
+   "name": "language",
+   "value": "cpython3"
+  },
+  {
+   "name": "package",
+   "value": "tests.test_repositories"
+  }
+ ],
+ "titlePath": [
+  "tests",
+  "test_repositories.py",
+  "TestRepositories"
+ ]
+}

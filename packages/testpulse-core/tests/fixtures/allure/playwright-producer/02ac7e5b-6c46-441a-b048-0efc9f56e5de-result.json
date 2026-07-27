@@ -1,0 +1,272 @@
+{
+ "uuid": "02ac7e5b-6c46-441a-b048-0efc9f56e5de",
+ "name": "Empty username \u2192 validation message",
+ "historyId": "3274b7e67515a83fc8119c82dd1530e4:5bd835b0d6b1d4ada3b9f0db936e82c8",
+ "status": "passed",
+ "statusDetails": {},
+ "stage": "finished",
+ "steps": [
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [
+    {
+     "status": "passed",
+     "statusDetails": {},
+     "stage": "finished",
+     "steps": [
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [
+        {
+         "status": "passed",
+         "statusDetails": {},
+         "stage": "finished",
+         "steps": [],
+         "attachments": [],
+         "parameters": [],
+         "name": "Create context",
+         "start": 1780105635371,
+         "uuid": "117d3334-798c-48eb-9ff7-7e122a67ddb7",
+         "stop": 1780105635373
+        }
+       ],
+       "attachments": [],
+       "parameters": [],
+       "name": "Fixture \"context\"",
+       "start": 1780105635370,
+       "uuid": "d80bcb08-1ba4-4745-bf03-685c5e54bc2b",
+       "stop": 1780105635375
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [
+        {
+         "status": "passed",
+         "statusDetails": {},
+         "stage": "finished",
+         "steps": [],
+         "attachments": [],
+         "parameters": [],
+         "name": "Create page",
+         "start": 1780105635376,
+         "uuid": "32c25c43-e5b9-4a14-8029-be7d84ca6210",
+         "stop": 1780105635452
+        }
+       ],
+       "attachments": [],
+       "parameters": [],
+       "name": "Fixture \"page\"",
+       "start": 1780105635375,
+       "uuid": "0887435f-caea-41d1-9b42-ff33b20b6e7e",
+       "stop": 1780105635452
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Navigate to \"/web/index.php/auth/login\"",
+       "start": 1780105635453,
+       "uuid": "52841ca4-fed0-421f-a080-42c0cfada39a",
+       "stop": 1780105641415
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Wait for selector locator('input[name=\"username\"]')",
+       "start": 1780105641417,
+       "uuid": "fbd3b666-2cc0-4a7b-8cca-1771163163e2",
+       "stop": 1780105642246
+      }
+     ],
+     "attachments": [],
+     "parameters": [],
+     "name": "beforeEach hook",
+     "start": 1780105635364,
+     "uuid": "98a212ef-0103-4857-bb76-98af1a11e4ac",
+     "stop": 1780105642247
+    }
+   ],
+   "attachments": [],
+   "parameters": [],
+   "name": "Before Hooks",
+   "start": 1780105635364,
+   "uuid": "7ed5aaeb-ab6d-44ae-97fd-873e2be48091",
+   "stop": 1780105642247
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780105642249,
+   "name": "Fill \"admin123\" locator('input[name=\"password\"]')",
+   "uuid": "23cbd300-c0b2-4e7e-9b15-21d2813af218",
+   "stop": 1780105642376
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780105642378,
+   "name": "Click locator('button[type=\"submit\"]')",
+   "uuid": "8d87a23a-25d9-4d3d-b950-0f1bfb8ab89d",
+   "stop": 1780105642438
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780105642441,
+   "name": "Expect \"toBeVisible\" locator('.oxd-input-field-error-message').first()",
+   "uuid": "d34b4710-e615-4a4f-be30-fb0c35341e5c",
+   "stop": 1780105642475
+  },
+  {
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [
+    {
+     "name": "trace",
+     "source": "b41ce64f-956d-4c23-8888-09a5117c52d0-attachment.zip",
+     "type": "application/vnd.allure.playwright-trace"
+    }
+   ],
+   "parameters": [],
+   "start": 1780105643003,
+   "name": "trace",
+   "stop": 1780105643003
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [
+    {
+     "status": "passed",
+     "statusDetails": {},
+     "stage": "finished",
+     "steps": [],
+     "attachments": [],
+     "parameters": [],
+     "name": "Fixture \"page\"",
+     "start": 1780105642477,
+     "uuid": "6f753941-0081-45ae-9c12-0b3f4036c53a",
+     "stop": 1780105642477
+    },
+    {
+     "status": "passed",
+     "statusDetails": {},
+     "stage": "finished",
+     "steps": [
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Close context",
+       "start": 1780105642744,
+       "uuid": "1a02bd99-9ae1-4582-b409-06cf8b971260",
+       "stop": 1780105642835
+      }
+     ],
+     "attachments": [],
+     "parameters": [],
+     "name": "Fixture \"context\"",
+     "start": 1780105642477,
+     "uuid": "295b6be9-7228-4121-8f9e-c2de3c31611d",
+     "stop": 1780105642836
+    }
+   ],
+   "attachments": [],
+   "parameters": [],
+   "name": "After Hooks",
+   "start": 1780105642476,
+   "uuid": "7bc55f11-dbae-4516-b147-2f669a1d695a",
+   "stop": 1780105642841
+  }
+ ],
+ "attachments": [],
+ "parameters": [
+  {
+   "name": "Project",
+   "value": "chromium"
+  }
+ ],
+ "labels": [
+  {
+   "name": "language",
+   "value": "javascript"
+  },
+  {
+   "name": "framework",
+   "value": "playwright"
+  },
+  {
+   "name": "package",
+   "value": "orangehrm-playwright.auth.login.spec.ts"
+  },
+  {
+   "name": "_fallbackTestCaseId",
+   "value": "31068b37a661a2eb60d7127df246e260"
+  },
+  {
+   "name": "titlePath",
+   "value": " > chromium > auth/login.spec.ts > Authentication Tests"
+  },
+  {
+   "name": "host",
+   "value": "ci-runner-01"
+  },
+  {
+   "name": "thread",
+   "value": "pid-27827-worker-0"
+  },
+  {
+   "name": "parentSuite",
+   "value": "chromium"
+  },
+  {
+   "name": "suite",
+   "value": "auth/login.spec.ts"
+  },
+  {
+   "name": "subSuite",
+   "value": "Authentication Tests"
+  }
+ ],
+ "links": [],
+ "start": 1780105635368,
+ "testCaseId": "3274b7e67515a83fc8119c82dd1530e4",
+ "fullName": "auth/login.spec.ts:25:7",
+ "titlePath": [
+  "orangehrm-playwright",
+  "auth",
+  "login.spec.ts",
+  "Authentication Tests"
+ ],
+ "stop": 1780105642832
+}

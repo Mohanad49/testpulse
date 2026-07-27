@@ -1,0 +1,330 @@
+{
+ "uuid": "01441e79-7aed-4d6b-b7c2-d08058020eaa",
+ "name": "Verify vacancy appears in the list",
+ "historyId": "e67ff85eab2cd9f466ea2f3e337964fd:5bd835b0d6b1d4ada3b9f0db936e82c8",
+ "status": "skipped",
+ "statusDetails": {
+  "message": "Skipped: No Job Titles available in demo environment"
+ },
+ "stage": "finished",
+ "steps": [
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [
+    {
+     "status": "passed",
+     "statusDetails": {},
+     "stage": "finished",
+     "steps": [
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [
+        {
+         "status": "passed",
+         "statusDetails": {},
+         "stage": "finished",
+         "steps": [],
+         "attachments": [],
+         "parameters": [],
+         "name": "Create context",
+         "start": 1780147457505,
+         "uuid": "401f2dee-6e83-45a7-ab7f-eca0c2a47115",
+         "stop": 1780147457507
+        }
+       ],
+       "attachments": [],
+       "parameters": [],
+       "name": "Fixture \"context\"",
+       "start": 1780147457504,
+       "uuid": "b7c44174-2dcc-4da9-9db7-e66368194bc9",
+       "stop": 1780147457509
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [
+        {
+         "status": "passed",
+         "statusDetails": {},
+         "stage": "finished",
+         "steps": [],
+         "attachments": [],
+         "parameters": [],
+         "name": "Create page",
+         "start": 1780147457512,
+         "uuid": "674a585a-0396-4533-8a08-bedcc4281c63",
+         "stop": 1780147457600
+        }
+       ],
+       "attachments": [],
+       "parameters": [],
+       "name": "Fixture \"page\"",
+       "start": 1780147457510,
+       "uuid": "25a446bd-ac58-4728-ae59-1a920fda0042",
+       "stop": 1780147457600
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Navigate to \"/web/index.php/auth/login\"",
+       "start": 1780147457601,
+       "uuid": "0bb923e2-ab3e-4988-a0a6-d58a84727831",
+       "stop": 1780147463946
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Wait for selector locator('input[name=\"username\"]')",
+       "start": 1780147463947,
+       "uuid": "cd92e4f0-9383-4fd7-b3be-8b8225b4a4a2",
+       "stop": 1780147464757
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Fill \"Admin\" locator('input[name=\"username\"]')",
+       "start": 1780147464758,
+       "uuid": "e9ba0694-e0e4-402b-bf65-9cd82dd37ca8",
+       "stop": 1780147464770
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Fill \"admin123\" locator('input[name=\"password\"]')",
+       "start": 1780147464771,
+       "uuid": "2e9dd25c-3275-4ee5-a441-ccb9f17c8d56",
+       "stop": 1780147464828
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Click locator('button[type=\"submit\"]')",
+       "start": 1780147464829,
+       "uuid": "9d2dcf4d-550c-401d-8cdb-9f1e1b279ab6",
+       "stop": 1780147464856
+      },
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Wait for navigation",
+       "start": 1780147464857,
+       "uuid": "1286c763-920d-4c5e-9955-59e0c3b913d7",
+       "stop": 1780147466250
+      }
+     ],
+     "attachments": [],
+     "parameters": [],
+     "name": "beforeEach hook",
+     "start": 1780147457493,
+     "uuid": "85b2d496-8290-441a-894a-8dde69b36642",
+     "stop": 1780147466250
+    }
+   ],
+   "attachments": [],
+   "parameters": [],
+   "name": "Before Hooks",
+   "start": 1780147457493,
+   "uuid": "f420f189-3ace-4485-b803-d98fae668b5b",
+   "stop": 1780147466250
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780147466251,
+   "name": "Navigate to \"/web/index.php/recruitment/addJobVacancy\"",
+   "uuid": "409a2216-5141-42d0-b0ef-e6684631af82",
+   "stop": 1780147467019
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780147467020,
+   "name": "Wait for load state \"domcontentloaded\"",
+   "uuid": "ce8f827b-3a2a-49e6-a3fe-39bb2b408f73",
+   "stop": 1780147467020
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780147467021,
+   "name": "Wait for selector locator('.oxd-grid-item:has(.oxd-label:has-text(\"Vacancy Name\")) input.oxd-input')",
+   "uuid": "b49694ec-9794-4610-962e-1f8745c04813",
+   "stop": 1780147467232
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780147467234,
+   "name": "Fill \"ListTest 466250\" locator('.oxd-grid-item:has(.oxd-label:has-text(\"Vacancy Name\")) input.oxd-input')",
+   "uuid": "589d6c03-b0ae-4245-ae50-5bbc20c95d9a",
+   "stop": 1780147467248
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [],
+   "attachments": [],
+   "parameters": [],
+   "start": 1780147467250,
+   "name": "Click locator('.oxd-grid-item:has(.oxd-label:has-text(\"Job Title\")) .oxd-select-text')",
+   "uuid": "ec921eae-f241-45ae-8854-491b173ca726",
+   "stop": 1780147467290
+  },
+  {
+   "status": "passed",
+   "statusDetails": {},
+   "stage": "finished",
+   "steps": [
+    {
+     "status": "passed",
+     "statusDetails": {},
+     "stage": "finished",
+     "steps": [],
+     "attachments": [],
+     "parameters": [],
+     "name": "Fixture \"page\"",
+     "start": 1780147467299,
+     "uuid": "d103a49e-a133-4f3c-a793-e94b5ba071cf",
+     "stop": 1780147467299
+    },
+    {
+     "status": "passed",
+     "statusDetails": {},
+     "stage": "finished",
+     "steps": [
+      {
+       "status": "passed",
+       "statusDetails": {},
+       "stage": "finished",
+       "steps": [],
+       "attachments": [],
+       "parameters": [],
+       "name": "Close context",
+       "start": 1780147467650,
+       "uuid": "134f9624-212d-4f0f-9dcb-8ea78342e189",
+       "stop": 1780147467731
+      }
+     ],
+     "attachments": [],
+     "parameters": [],
+     "name": "Fixture \"context\"",
+     "start": 1780147467299,
+     "uuid": "19fd8ad3-cbc9-4eb0-b6af-24e902547840",
+     "stop": 1780147467731
+    }
+   ],
+   "attachments": [],
+   "parameters": [],
+   "name": "After Hooks",
+   "start": 1780147467298,
+   "uuid": "28b72245-0f66-43df-b846-6ef4853228ce",
+   "stop": 1780147467738
+  }
+ ],
+ "attachments": [],
+ "parameters": [
+  {
+   "name": "Project",
+   "value": "chromium"
+  }
+ ],
+ "labels": [
+  {
+   "name": "language",
+   "value": "javascript"
+  },
+  {
+   "name": "framework",
+   "value": "playwright"
+  },
+  {
+   "name": "package",
+   "value": "orangehrm-playwright.recruitment.recruitment.spec.ts"
+  },
+  {
+   "name": "_fallbackTestCaseId",
+   "value": "69e6eb58623fd30047f984b348a5f1b9"
+  },
+  {
+   "name": "titlePath",
+   "value": " > chromium > recruitment/recruitment.spec.ts > Recruitment Tests"
+  },
+  {
+   "name": "host",
+   "value": "ci-runner-01"
+  },
+  {
+   "name": "thread",
+   "value": "pid-30530-worker-3"
+  },
+  {
+   "name": "parentSuite",
+   "value": "chromium"
+  },
+  {
+   "name": "suite",
+   "value": "recruitment/recruitment.spec.ts"
+  },
+  {
+   "name": "subSuite",
+   "value": "Recruitment Tests"
+  }
+ ],
+ "links": [],
+ "start": 1780147457491,
+ "testCaseId": "e67ff85eab2cd9f466ea2f3e337964fd",
+ "fullName": "recruitment/recruitment.spec.ts:38:7",
+ "titlePath": [
+  "orangehrm-playwright",
+  "recruitment",
+  "recruitment.spec.ts",
+  "Recruitment Tests"
+ ],
+ "stop": 1780147467718
+}
