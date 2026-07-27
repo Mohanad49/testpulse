@@ -1,0 +1,44 @@
+[project]
+name = "testpulse-core"
+version = "0.1.0"
+description = "Parsers, storage layer and CLI for TestPulse."
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "typer>=0.15",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+]
+
+[project.scripts]
+testpulse = "testpulse_core.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/testpulse_core"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+# Third-party packages without inline type information. Listing them explicitly rather than
+# disabling the global check keeps strict mode honest about our own code.
+[[tool.mypy.overrides]]
+module = ["alembic.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

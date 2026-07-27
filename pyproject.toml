@@ -1,0 +1,23 @@
+[project]
+name = "testpulse"
+version = "0.1.0"
+description = "Test observability and flake-detection platform for CI test suites."
+requires-python = ">=3.12"
+dependencies = ["testpulse-core"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+testpulse-core = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "mypy>=1.14",
+    "ruff>=0.9",
+]

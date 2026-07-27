@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local ingest databases. Never commit test data captured from a real system.
+*.db
+*.sqlite
+*.sqlite3
