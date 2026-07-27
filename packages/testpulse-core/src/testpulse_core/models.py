@@ -30,6 +30,11 @@ class TestStatus(StrEnum):
     SKIPPED = "skipped"
     ERROR = "error"
 
+    # This project's domain nouns unavoidably start with "Test", which is also
+    # pytest's class-collection prefix. Opting out explicitly is clearer than
+    # renaming the domain or widening pytest's collection config.
+    __test__ = False
+
 
 @dataclass(frozen=True, slots=True)
 class RunMetadata:
@@ -53,6 +58,8 @@ class RunMetadata:
 class TestResult:
     """One test outcome within one run."""
 
+    __test__ = False
+
     test_id: str
     display_name: str
     status: TestStatus
@@ -73,6 +80,8 @@ class TestResult:
 @dataclass(slots=True)
 class TestRun:
     """A parsed report file or directory, plus the CI context around it."""
+
+    __test__ = False
 
     suite_name: str
     started_at: datetime
