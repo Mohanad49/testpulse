@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<coverage version="7.6.1" timestamp="1785193159000">
+  <packages>
+    <package name="testpulse_core" line-rate="0.91"/>
+  </packages>
+</coverage>

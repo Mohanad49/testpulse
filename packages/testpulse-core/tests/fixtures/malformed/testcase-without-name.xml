@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="broken">
+  <testsuite name="suite-a" tests="2" timestamp="2026-07-01T10:00:00+00:00">
+    <testcase classname="mod.Class" name="test_ok" time="0.010"/>
+    <testcase classname="mod.Class" time="0.020"/>
+  </testsuite>
+</testsuites>

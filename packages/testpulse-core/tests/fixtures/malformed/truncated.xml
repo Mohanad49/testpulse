@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="2" skipped="1" tests="9" time="0.067" timestamp="2026-07-28T01:59:19.267389+03:00" hostname="ci-runner-01"><testcase classname="test_sample_suite" name="test_login_succeeds" time="0.001" /><testcase classname="test_sample_suite" name="test_search_returns_results" time="0.001" /><testcase classname="test_sample_suite" name="test_cart_total_is_correct" time="0.001"><failure message="AssertionError: expected total 30 for 3 items at 10 each&#10;assert (10 * 3) == 31">def test_cart_total_is_correct():
+&gt;       assert 10 * 3 == 31, "expected total 30 for 3 items at 10 each"
+E       AssertionError: expected total 30 for 3 items at 10 each
+E       assert (10 * 3) == 31
+
+test_sample_suite.py:13: AssertionError</failure></testcase><testcase classname="test_sample_suite" name="test_
