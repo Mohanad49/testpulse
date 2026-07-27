@@ -162,3 +162,35 @@ def test_result_without_a_name_is_rejected(tmp_path):
     (tmp_path / "x-result.json").write_text(json.dumps({"status": "passed"}))
     with pytest.raises(ParseError, match="no 'name' field"):
         AllureParser().parse(tmp_path, META)
+
+
+def test_a_directory_holding_one_run_produces_no_warnings(pw_run):
+    assert pw_run.warnings == []
+
+
+def test_accumulated_directory_is_detected(tmp_path):
+    # Allure appends; nothing clears the directory unless CI does. A developer
+    # re-running a suite locally accumulates every run in one place, and this
+    # parser would otherwise call all of it a single run.
+    source = sorted(PLAYWRIGHT_DIR.glob("*-result.json"))
+    for copy_index in range(3):
+        for original in source:
+            (tmp_path / f"{copy_index}-{original.name}").write_text(original.read_text())
+
+    run = AllureParser().parse(tmp_path, META)
+    assert run.total == len(source) * 3
+    assert len(run.warnings) == 1
+    warning = run.warnings[0]
+    assert "accumulator, not a run boundary" in warning
+    assert "3 times" in warning
+
+
+def test_the_warning_does_not_block_the_parse(tmp_path):
+    # The caller may want the data anyway; the point is that it cannot happen
+    # silently.
+    source = next(PLAYWRIGHT_DIR.glob("*-result.json"))
+    (tmp_path / "a-result.json").write_text(source.read_text())
+    (tmp_path / "b-result.json").write_text(source.read_text())
+    run = AllureParser().parse(tmp_path, META)
+    assert run.total == 2
+    assert run.warnings

@@ -111,6 +111,9 @@ def ingest(
         typer.secho(f"Could not parse report: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(EXIT_PARSE_ERROR) from exc
 
+    for warning in run.warnings:
+        typer.secho(f"Warning: {warning}", fg=typer.colors.YELLOW, err=True)
+
     engine = create_db_engine(database_url)
     try:
         with session_scope(engine) as session:

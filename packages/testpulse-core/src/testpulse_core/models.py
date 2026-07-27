@@ -92,6 +92,10 @@ class TestRun:
     branch: str | None = None
     ci_run_url: str | None = None
     environment: str | None = None
+    warnings: list[str] = field(default_factory=list)
+    """Problems with the input that do not make it unparseable, but do make the
+    resulting data less trustworthy. Surfaced by the CLI rather than raised,
+    because the caller may legitimately want the data anyway."""
 
     @property
     def total(self) -> int:

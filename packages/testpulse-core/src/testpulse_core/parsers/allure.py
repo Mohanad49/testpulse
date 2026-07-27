@@ -97,6 +97,43 @@ def _identity(document: dict[str, Any], labels: dict[str, str]) -> tuple[str | N
     return file_path, class_name
 
 
+def _accumulation_warnings(results: list[TestResult]) -> list[str]:
+    """Warn when a directory looks like several runs rather than one.
+
+    Every other supported format is a single file written once per run, so the
+    file *is* the run boundary. Allure has no such boundary: the adapter appends
+    a result file per test and nothing clears the directory unless CI explicitly
+    does. A developer running a suite repeatedly on their machine accumulates
+    every run in one directory.
+
+    Found by ingesting a real 124-file directory from an existing suite: it held
+    only 18 distinct tests, so roughly nine runs had piled up, and the same test
+    appeared as passed, failed, skipped and error inside what this parser was
+    calling a single run. That is not a small inaccuracy — run-level pass rate
+    and duration become meaningless, and Phase 2's rolling window would treat
+    nine runs as one data point.
+
+    Detecting it is cheap and honest; splitting the directory into runs is not
+    attempted here, because doing it correctly means deciding what separates two
+    runs (a time gap? a distinct set of tests?) and that belongs with the
+    metrics work, not the parser.
+    """
+    seen: dict[str, int] = {}
+    for result in results:
+        seen[result.test_id] = seen.get(result.test_id, 0) + 1
+    repeated = {test_id: n for test_id, n in seen.items() if n > 1}
+    if not repeated:
+        return []
+    worst = max(repeated.values())
+    return [
+        f"{len(results)} results but only {len(seen)} distinct tests: "
+        f"{len(repeated)} test(s) appear more than once, one of them {worst} times. "
+        "An Allure results directory is an accumulator, not a run boundary - this "
+        "directory most likely holds several runs. Clear it between runs, or the "
+        "run-level metrics derived from it will be meaningless."
+    ]
+
+
 class AllureParser:
     """Parses an Allure results directory into a normalised run."""
 
@@ -176,6 +213,7 @@ class AllureParser:
         finished_at = datetime.fromtimestamp(max(stops) / 1000, tz=UTC) if stops else None
 
         return TestRun(
+            warnings=_accumulation_warnings(results),
             suite_name=meta.suite_name,
             started_at=started_at,
             finished_at=finished_at,
