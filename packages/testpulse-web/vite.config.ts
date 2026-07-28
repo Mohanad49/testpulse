@@ -18,7 +18,11 @@ export default defineConfig({
   // build and every API call 404s, which looks like a broken app rather than a
   // missing proxy.
   server: { proxy: API_PROXY },
-  preview: { proxy: API_PROXY },
+  // host pinned to 127.0.0.1 rather than left as the default. vite binds to
+  // "localhost", which resolves to ::1 first on this machine, while Playwright's
+  // webServer health check polls 127.0.0.1 - so the server was up and the check
+  // timed out anyway.
+  preview: { proxy: API_PROXY, host: "127.0.0.1", port: 4173 },
   test: {
     environment: "jsdom",
     globals: true,

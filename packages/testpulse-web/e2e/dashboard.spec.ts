@@ -13,8 +13,10 @@ const SUITE = "e2e-demo";
 test.describe("suite overview", () => {
   test("shows headline metrics and the recent runs table", async ({ page }) => {
     await page.goto(`/suites/${SUITE}`);
-    await expect(page.getByText("Pass rate")).toBeVisible();
-    await expect(page.getByText("Flaky tests")).toBeVisible();
+    // exact, because "Pass rate" also matches the "Pass rate over time" heading
+    // and a substring match resolves to two elements.
+    await expect(page.getByText("Pass rate", { exact: true })).toBeVisible();
+    await expect(page.getByText("Flaky tests", { exact: true })).toBeVisible();
     await expect(page.getByRole("table", { name: /recent runs/i })).toBeVisible();
   });
 
@@ -33,7 +35,11 @@ test.describe("flakiness leaderboard", () => {
 
   test("expands a row into its run history", async ({ page }) => {
     await page.goto(`/suites/${SUITE}/flaky`);
-    const toggle = page.getByRole("button", { name: /show run history/i }).first();
+    // Located by aria-controls, not by name. The accessible name deliberately
+    // changes from "Show" to "Hide" on click, so a name-based locator stops
+    // matching the element it just clicked - which is exactly how a test that
+    // passes locally becomes a flake in CI.
+    const toggle = page.locator('button[aria-controls="flaky-history-0"]');
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -44,7 +50,7 @@ test.describe("flakiness leaderboard", () => {
 
   test("the timeline is keyboard navigable", async ({ page }) => {
     await page.goto(`/suites/${SUITE}/flaky`);
-    await page.getByRole("button", { name: /show run history/i }).first().click();
+    await page.locator('button[aria-controls="flaky-history-0"]').click();
     const cells = page.getByRole("group", { name: /run history/i }).first().getByRole("button");
     await cells.first().focus();
     await page.keyboard.press("ArrowRight");
@@ -55,7 +61,7 @@ test.describe("flakiness leaderboard", () => {
 
   test("every timeline cell names its status in text, not only in colour", async ({ page }) => {
     await page.goto(`/suites/${SUITE}/flaky`);
-    await page.getByRole("button", { name: /show run history/i }).first().click();
+    await page.locator('button[aria-controls="flaky-history-0"]').click();
     const cells = page.getByRole("group", { name: /run history/i }).first().getByRole("button");
     const count = await cells.count();
     expect(count).toBeGreaterThan(0);
@@ -124,8 +130,12 @@ for (const theme of ["dark", "light"] as const) {
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
         .analyze();
 
+      // Report the offending element and the measured ratio, not just the rule
+      // name. "color-contrast (1)" tells you nothing about where to look.
       expect(
-        results.violations.map((v) => `${v.id} (${v.nodes.length}): ${v.help}`),
+        results.violations.flatMap((v) =>
+          v.nodes.map((n) => `${v.id}: ${n.target.join(" ")} :: ${n.failureSummary?.replace(/\s+/g, " ").slice(0, 200)}`),
+        ),
       ).toEqual([]);
     });
   }

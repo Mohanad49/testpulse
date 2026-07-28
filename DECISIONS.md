@@ -728,16 +728,18 @@ much closer to the "muted" tier than I designed it to be, and I am taking that
 trade: AA sets a floor on how quiet text is allowed to be, and hint text nobody
 can read is a bug rather than a design choice.
 
-**And one false alarm worth recording.** A scan appeared to show five contrast
-failures in light mode, reporting a dark-mode foreground against a light-mode
-background — a combination that cannot exist. It turned out to be a stale style
-recalculation caused by me flipping `data-theme` from the console instead of
-using the toggle. Setting the preference and reloading gave zero violations in
-both themes. I nearly "fixed" a bug that was not there, which would have meant
-changing a palette to satisfy a measurement artifact.
+**And one thing I got wrong, corrected in Phase 5.** A scan appeared to show
+five contrast failures in light mode, reporting a dark-mode foreground against a
+light-mode background — a combination that cannot exist. I diagnosed it as a
+stale style recalculation caused by flipping `data-theme` from the console, and
+concluded the light-mode failures were an artifact.
 
-Final state: **zero violations, 27 passes, in both themes**, on the real page
-with a row expanded.
+**The specific mixed-token reading was an artifact. The conclusion that light
+mode was clean was not.** The Phase 5 Playwright suite, loading each theme
+properly from `localStorage` on a fresh page, found real contrast failures in
+*both* themes. See the Phase 5 section. The lesson is not "trust the scan" but
+"a console scan of a page I hand-mutated is not the same instrument as a scan of
+a page loaded normally", and I stopped at the first explanation that fitted.
 
 ### No data-fetching library
 
@@ -934,3 +936,44 @@ connection is cost with no benefit.
 - No Playwright sharding. The suite is 21 tests and does not need it; the Cal.com
   project will.
 - The Docker images are built in CI and never pushed. Also Phase 6.
+
+### The accessibility bugs I had previously talked myself out of
+
+The E2E suite runs axe against ten pages — five views, two themes — each loaded
+fresh with the theme set before first paint. It failed on the first honest run,
+and it was right.
+
+**Badges failed contrast in both themes.** A badge draws its background by mixing
+its status colour into the card at 14-16%, and I used that same status colour for
+the text. So the text was a hue sitting on a washed-out version of itself:
+measured 3.73:1 for the danger badge on dark, 4.01:1 for the warning badge on
+light. Badge foregrounds are now their own tokens, lifted two steps from the
+status colour they are tinted with.
+
+**The light-mode accent failed too.** `#0284c7` measured 3.91:1 on the page
+background and 4.09:1 on a card, and it is used for 12px link text. Darkened to
+`#0369a1`.
+
+I had previously convinced myself the light-mode failures were a measurement
+artifact (see the Phase 4 note, now corrected). They were not. What made the
+difference was the instrument: a scan of a page whose theme I had flipped from
+the console is not the same as a scan of a page that loaded in that theme. The
+first attempt gave me a reading that looked impossible, and I used "impossible"
+as a reason to dismiss the whole finding rather than to fix how I was measuring.
+
+### Two of my own tests were flaky by construction
+
+The same run failed two E2E tests, and neither was an app bug.
+
+**A strict-mode violation.** `getByText("Pass rate")` also matches the heading
+"Pass rate over time". Needed `exact: true`.
+
+**A locator that the action invalidates.** I located the expand toggle by
+`name: /show run history/i`, clicked it, then asserted on the same locator. The
+button's accessible name deliberately changes from "Show" to "Hide" when
+expanded, so after the click the locator matched nothing. It now locates by
+`aria-controls`, which is stable across the state change.
+
+That second one is the more useful mistake. A locator that depends on text the
+action itself changes is a test that passes when it is fast and fails when it is
+slow, which is precisely the class of flake this whole project exists to detect.

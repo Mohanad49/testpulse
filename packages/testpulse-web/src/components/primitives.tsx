@@ -166,11 +166,14 @@ export function Badge({
   title?: string;
 }) {
   const tones: Record<string, { fg: string; bg: string }> = {
+    // Foreground is a dedicated token, not the status colour. A badge tints its
+    // own background with that colour, so reusing it for the text puts a hue
+    // against a washed version of itself and fails contrast.
     neutral: { fg: "var(--fg-muted)", bg: "var(--bg-subtle)" },
-    danger: { fg: "var(--status-failed)", bg: "color-mix(in srgb, var(--status-failed) 14%, transparent)" },
-    warn: { fg: "var(--status-error)", bg: "color-mix(in srgb, var(--status-error) 16%, transparent)" },
-    ok: { fg: "var(--status-passed)", bg: "color-mix(in srgb, var(--status-passed) 16%, transparent)" },
-    accent: { fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 16%, transparent)" },
+    danger: { fg: "var(--badge-danger-fg)", bg: "color-mix(in srgb, var(--status-failed) 14%, transparent)" },
+    warn: { fg: "var(--badge-warn-fg)", bg: "color-mix(in srgb, var(--status-error) 16%, transparent)" },
+    ok: { fg: "var(--badge-ok-fg)", bg: "color-mix(in srgb, var(--status-passed) 16%, transparent)" },
+    accent: { fg: "var(--badge-accent-fg)", bg: "color-mix(in srgb, var(--accent) 16%, transparent)" },
   };
   const { fg, bg } = tones[tone];
   return (

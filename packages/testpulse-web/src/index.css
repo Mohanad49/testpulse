@@ -55,6 +55,16 @@
   --accent: #38bdf8;
   --accent-fg: #0f172a;
 
+  /* Badge text is a separate token from the status colour it is tinted with.
+     A badge draws its background by mixing its status colour into the card at
+     14-16%, so using that same colour for the text puts a hue against a washed
+     version of itself - measured 3.73:1 for danger on dark. These are lifted
+     two steps so the text clears 4.5:1 against its own tint. */
+  --badge-danger-fg: #fda4af;
+  --badge-warn-fg: #fcd34d;
+  --badge-ok-fg: #6ee7b7;
+  --badge-accent-fg: #7dd3fc;
+
   /* Status. Paired with a glyph everywhere they are used - see StatusCell.
      Colour is never the only channel carrying meaning. */
   --status-passed: #10b981;
@@ -80,8 +90,15 @@
   --fg-muted: #475569;
   --fg-subtle: #64748b;
 
-  --accent: #0284c7;
+  /* Was #0284c7, which measured 3.91:1 on the page background and 4.09:1 on a
+     card - both under 4.5:1 for the 12px link text it is used for. */
+  --accent: #0369a1;
   --accent-fg: #ffffff;
+
+  --badge-danger-fg: #9f1239;
+  --badge-warn-fg: #92400e;
+  --badge-ok-fg: #065f46;
+  --badge-accent-fg: #075985;
 
   /* Darkened from the dark-mode values. The same green that reads well on
      #0f172a fails contrast on white, and shipping one palette for both themes is
