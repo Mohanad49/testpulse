@@ -2,9 +2,9 @@
 
 Test observability and flake detection for CI test suites.
 
-> **Status: Phase 1 of 6.** Ingestion and storage only. The metrics engine, flake
-> classifier, API and dashboard are not built yet. This README is a placeholder;
-> the full case study is written in Phase 6.
+> **Status: Phase 2 of 6.** Ingestion, storage, metrics and flake detection. The
+> API and dashboard are not built yet. This README is a placeholder; the full case
+> study is written in Phase 6.
 
 ## The problem
 
@@ -37,6 +37,42 @@ uv run testpulse ingest \
 `testpulse formats` lists the parsers this build has. `testpulse info` prints the
 database it would write to.
 
+Then ask it what it found:
+
+```bash
+testpulse metrics --suite admin-portal-e2e        # per-test health, flakiest first
+testpulse flaky   --suite admin-portal-e2e        # just the flaky ones, with evidence
+testpulse flaky   --suite admin-portal-e2e --fail-on-flaky   # exits 5, for gating CI
+
+testpulse quarantine add  --suite admin-portal-e2e --test-id "..." --reason "..." --by you
+testpulse quarantine list --suite admin-portal-e2e --format pytest-deselect
+```
+
+### Flake detection
+
+Two classifiers run by default and they catch different things.
+
+**same-commit** is close to proof: one commit that produced two different
+outcomes. Either two runs of the same SHA disagreeing, or a single result that
+was retried and went green (runners only retry a test that did not pass). Almost
+no false positives, but it finds nothing unless your suite retries or CI runs a
+commit twice.
+
+**rolling-flip** needs neither. A test is flaky if its pass rate is between 0.05
+and 0.95 *and* its flip rate is above 0.20. The flip gate is the important one:
+a test that passed 30 times then failed 20 times has a pass rate of 0.6 but
+flipped exactly once, which is a regression with a cause, not a flaky test.
+
+Every threshold is config, never a literal in the code. Put a `testpulse.toml`
+next to the database or set `TESTPULSE_FLAKE__FLIP_RATE_THRESHOLD` and friends.
+
+### Quarantine
+
+Quarantining is a human decision that gets recorded, not something derived from
+the metrics automatically, and every entry expires (14 days by default). Expiry
+does not re-enable the test or delete the entry. It just stops the list being
+quiet about age, so a quarantine list cannot silently become a graveyard.
+
 Exit codes are distinct because a CI step needs to tell them apart: `2` the report
 could not be parsed, `3` this run was already ingested, `4` bad usage. `3` is
 frequently fine and `2` never is.
@@ -57,6 +93,8 @@ Three things worth knowing before reading the code:
   silently ineffective on formats that cannot answer.
 - **An Allure results directory is not a run boundary.** It accumulates. The
   parser detects this and warns; it does not try to split it.
+- **`flakiness_score` only describes the rolling-flip strategy.** A same-commit
+  finding can score 0.00, so it can never be the only sort key.
 
 ## Testing
 
@@ -75,5 +113,5 @@ provenance.
 
 ## Not built yet
 
-Phase 2 metrics and flake classification · Phase 3 FastAPI service · Phase 4
-dashboard · Phase 5 GitHub Action and CI · Phase 6 deployment and case study.
+Phase 3 FastAPI service · Phase 4 dashboard · Phase 5 GitHub Action and CI ·
+Phase 6 deployment and case study.
