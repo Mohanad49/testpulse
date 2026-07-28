@@ -74,8 +74,9 @@ does not re-enable the test or delete the entry. It just stops the list being
 quiet about age, so a quarantine list cannot silently become a graveyard.
 
 Exit codes are distinct because a CI step needs to tell them apart: `2` the report
-could not be parsed, `3` this run was already ingested, `4` bad usage. `3` is
-frequently fine and `2` never is.
+could not be parsed, `3` this run was already ingested, `4` bad usage, `5` flaky
+tests were found. `3` is frequently fine and `2` never is; `5` means the suite ran
+and something in it is unreliable, which is not the same as a broken build.
 
 ## Design notes
 
