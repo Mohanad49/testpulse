@@ -7,6 +7,7 @@ a suite" rather than "the last N days" or "everything since the last release".
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -163,3 +164,184 @@ def suite_metrics(
         key=lambda m: (not m.is_flaky, -m.flakiness_score, -m.p95_duration_ms)
     )
     return results
+
+
+@dataclass(frozen=True, slots=True)
+class RunSummary:
+    """One run, reduced to what a dashboard row or a sparkline point needs."""
+
+    id: int
+    started_at: datetime
+    finished_at: datetime | None
+    commit_sha: str | None
+    branch: str | None
+    environment: str | None
+    source_format: str
+    total: int
+    passed: int
+    failed: int
+    skipped: int
+    errored: int
+    duration_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class SuiteHealth:
+    """Suite-level aggregate over the current window."""
+
+    suite_name: str
+    runs_in_window: int
+    total_tests: int
+    flaky_count: int
+    newly_failing_count: int
+    pass_rate: float | None
+    """Across every scored result in the window, not the mean of per-run rates.
+    Averaging per-run rates would weight a 3-test smoke run the same as a
+    400-test regression run."""
+
+    mean_run_duration_ms: float
+    run_duration_trend_ms_per_run: float
+    recent_runs: list[RunSummary]
+
+
+def recent_runs(
+    session: Session,
+    suite_name: str,
+    limit: int = 20,
+    branch: str | None = None,
+) -> list[RunSummary]:
+    """Most recent runs first, which is the order a runs table displays them in."""
+    statement = (
+        select(TestRunRow)
+        .where(TestRunRow.suite_name == suite_name)
+        .order_by(TestRunRow.started_at.desc())
+        .limit(limit)
+    )
+    if branch is not None:
+        statement = statement.where(TestRunRow.branch == branch)
+
+    summaries = []
+    for row in session.execute(statement).scalars().all():
+        # finished_at is an estimate for some formats (see the JUnit parser), so
+        # a negative or absent span collapses to zero rather than propagating a
+        # nonsense duration into a chart.
+        span = 0
+        if row.finished_at is not None:
+            span = max(int((row.finished_at - row.started_at).total_seconds() * 1000), 0)
+        summaries.append(
+            RunSummary(
+                id=row.id,
+                started_at=row.started_at,
+                finished_at=row.finished_at,
+                commit_sha=row.commit_sha,
+                branch=row.branch,
+                environment=row.environment,
+                source_format=row.source_format,
+                total=row.total,
+                passed=row.passed,
+                failed=row.failed,
+                skipped=row.skipped,
+                errored=row.errored,
+                duration_ms=span,
+            )
+        )
+    return summaries
+
+
+def suite_health(
+    session: Session,
+    suite_name: str,
+    flake_config: FlakeConfig,
+    newly_failing_config: NewlyFailingConfig,
+    branch: str | None = None,
+    recent_limit: int = 20,
+) -> SuiteHealth | None:
+    """Aggregate health for a suite, or None if it has no runs at all.
+
+    None rather than a zeroed record: "this suite has never run" and "this suite
+    ran and everything failed" are different answers and a caller must be able to
+    tell them apart. The API turns the first into a 404.
+    """
+    runs = recent_runs(session, suite_name, limit=flake_config.window_size, branch=branch)
+    if not runs:
+        return None
+
+    metrics = suite_metrics(session, suite_name, flake_config, newly_failing_config, branch)
+
+    scored_total = sum(run.passed + run.failed + run.errored for run in runs)
+    passed_total = sum(run.passed for run in runs)
+
+    # Runs come back newest first; reverse so the trend slope points forward in
+    # time. Getting this backwards silently inverts every trend arrow.
+    oldest_first = list(reversed(runs))
+    durations = [run.duration_ms for run in oldest_first]
+    n = len(durations)
+    if n < 2:
+        slope = 0.0
+    else:
+        mean_x = (n - 1) / 2
+        mean_y = sum(durations) / n
+        denominator = sum((i - mean_x) ** 2 for i in range(n))
+        slope = (
+            sum((i - mean_x) * (d - mean_y) for i, d in enumerate(durations)) / denominator
+            if denominator
+            else 0.0
+        )
+
+    return SuiteHealth(
+        suite_name=suite_name,
+        runs_in_window=len(runs),
+        total_tests=len(metrics),
+        flaky_count=sum(1 for m in metrics if m.is_flaky),
+        newly_failing_count=sum(1 for m in metrics if m.is_newly_failing),
+        pass_rate=(passed_total / scored_total) if scored_total else None,
+        mean_run_duration_ms=(sum(durations) / n) if n else 0.0,
+        run_duration_trend_ms_per_run=slope,
+        recent_runs=runs[:recent_limit],
+    )
+
+
+def test_history(
+    session: Session,
+    suite_name: str,
+    test_id: str,
+    limit: int = 100,
+) -> list[tuple[RunSummary, TestResultRow]]:
+    """Every recorded appearance of one test, oldest first.
+
+    Returns the run alongside the result because a status timeline is meaningless
+    without the commit and time each cell belongs to.
+    """
+    statement = (
+        select(TestRunRow, TestResultRow)
+        .join(TestResultRow, TestRunRow.id == TestResultRow.run_id)
+        .where(TestRunRow.suite_name == suite_name, TestResultRow.test_id == test_id)
+        .order_by(TestRunRow.started_at.desc())
+        .limit(limit)
+    )
+    pairs = []
+    for run_row, result_row in session.execute(statement).all():
+        span = 0
+        if run_row.finished_at is not None:
+            span = max(int((run_row.finished_at - run_row.started_at).total_seconds() * 1000), 0)
+        pairs.append(
+            (
+                RunSummary(
+                    id=run_row.id,
+                    started_at=run_row.started_at,
+                    finished_at=run_row.finished_at,
+                    commit_sha=run_row.commit_sha,
+                    branch=run_row.branch,
+                    environment=run_row.environment,
+                    source_format=run_row.source_format,
+                    total=run_row.total,
+                    passed=run_row.passed,
+                    failed=run_row.failed,
+                    skipped=run_row.skipped,
+                    errored=run_row.errored,
+                    duration_ms=span,
+                ),
+                result_row,
+            )
+        )
+    return list(reversed(pairs))
