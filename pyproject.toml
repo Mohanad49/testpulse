@@ -3,7 +3,7 @@ name = "testpulse"
 version = "0.1.0"
 description = "Test observability and flake-detection platform for CI test suites."
 requires-python = ">=3.12"
-dependencies = ["testpulse-core"]
+dependencies = ["testpulse-core", "testpulse-api"]
 
 [tool.uv]
 package = false
@@ -13,6 +13,7 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 testpulse-core = { workspace = true }
+testpulse-api = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -21,4 +22,6 @@ dev = [
     "mypy>=1.14",
     "ruff>=0.9",
     "hypothesis>=6.163.0",
+    "httpx>=0.28",
+    "jsonschema>=4.23",
 ]
