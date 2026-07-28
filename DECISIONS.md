@@ -443,3 +443,178 @@ observed duration, a test that never failed has no failure signals, and
 - Nothing recomputes metrics incrementally. Every call recomputes the whole
   window from raw rows. Fine at this size, will need caching before the API is
   serving a dashboard.
+
+---
+
+## Phase 3 — API
+
+### Response models are hand-written, not generated from the ORM
+
+There's a `schemas.py` full of Pydantic models that partly duplicate the
+SQLAlchemy entities. That duplication is the point.
+
+The database shape and the API shape are allowed to drift, and they already have.
+The API returns computed metrics that aren't in any table, and it hides things
+like the full failure stack that would make a list response enormous. If I
+generated these from the ORM, every future column rename would be a breaking
+change to a published contract, and I'd find out from a consumer.
+
+Cost: two definitions to update when a field changes. Accepted, same as the
+parser/ORM split in Phase 1, for the same reason.
+
+### The test detail route is scoped under a suite, and uses a `:path` converter
+
+The endpoint list I started from had this as a flat `/api/tests/{test_id}`. Two
+things wrong with that.
+
+**`test_id` isn't globally unique.** `tests/a.py::Cls::test_login` can exist in an
+admin suite and a mobile suite at the same time. A flat route would merge two
+different tests' histories into one chart and nothing would look broken. So the
+route is `/api/suites/{suite}/tests/{test_id:path}`.
+
+**`test_id` contains slashes.** Real ones look like
+`recruitment/recruitment.spec.ts::Recruitment Tests::Delete a vacancy`. The
+obvious fix is percent-encoding the id, and percent-encoded slashes are a trap:
+plenty of proxies normalise `%2F` back to `/` before the app ever sees the
+request, so the encoding works locally and silently stops working in the
+deployment where it matters. The `:path` converter takes the rest of the URL as
+one segment and sidesteps the whole thing.
+
+(Spaces still need encoding, obviously. I wasted a few minutes on a 000 from curl
+before working out it was my shell command and not the server.)
+
+### Sorting is an allowlist, not `getattr`
+
+`/tests?sort_by=` maps through a fixed dict. The lazy version is
+`getattr(metric, sort_by)`, which lets a request sort by any attribute that
+happens to exist on the object, and turns a typo into a 500 instead of a 422.
+Neither is catastrophic on a read-only metrics endpoint, but "user input reaches
+getattr" is the kind of thing I'd flag in someone else's code review.
+
+Nulls sort last in both directions. A test with no pass rate hasn't scored well or
+badly, and letting it float to the top of an ascending sort puts "no data" above
+"worst", which is the wrong answer to the question the user asked.
+
+### The paginated endpoint doesn't actually reduce work, and says so
+
+`/tests` computes metrics for the whole suite in Python and then slices. Paging
+doesn't make the request cheaper. It can't: the sortable fields are computed
+metrics that don't exist in any column, so the sort can't be pushed into SQL.
+
+I'm leaving it. At portfolio scale it's irrelevant, and the honest fix isn't a
+cleverer query, it's a materialised metrics table refreshed on ingest. Writing
+that now would be building for a load that doesn't exist. The docstring says all
+of this so nobody has to discover it with a profiler.
+
+### `/health` doesn't touch the database
+
+The liveness endpoint returns a constant. It's tempting to have it run a `SELECT
+1`, and that's how you get an orchestrator killing a perfectly healthy API
+because a database failover took four seconds. Liveness and readiness are
+different questions. This one answers liveness.
+
+### The upload endpoint, and the part I actually thought hardest about
+
+Allure results are a directory, so accepting them over HTTP means accepting a
+zip, and unpacking an archive from an untrusted caller is the most dangerous
+thing in this codebase. Four guards, each for a different attack:
+
+**Path traversal (zip slip).** An entry named `../../../etc/cron.d/x` writes
+outside the extraction directory. Python's `extractall` does sanitise this now,
+but I check the resolved path anyway, because I'd rather assert the property I
+want than rely on the current behaviour of a stdlib function.
+
+**Symlinks.** A zip can carry a symlink entry pointing anywhere, and a later
+entry writes *through* it. The resolved-path check doesn't catch this, because
+the symlink itself lands legitimately inside the destination. Symlink entries get
+rejected outright. This is the one people miss.
+
+**Decompression bombs.** A few hundred KB can expand to gigabytes, so an upload
+size limit constrains nothing about what unpacking costs. Checked against the
+declared uncompressed size in the headers, before writing a byte.
+
+**Entry count.** Millions of tiny files exhaust inodes and time without ever
+tripping a size limit, so that's its own gate.
+
+All four have tests, and the malicious archives are built inside the tests rather
+than committed — committing a zip bomb to a public repo is a good way to get the
+repo flagged.
+
+**No auth.** That's a real gap, not an oversight. This endpoint writes to the
+database and anyone who can reach it can write to it. Fine while it's local or
+behind something that authenticates; has to be closed before the instance is
+public. It's written in the docstring so it can't be forgotten quietly.
+
+### 409 for a duplicate upload, not 400
+
+The request was well formed. It conflicts with what's already stored. A client
+can do something useful with that distinction ("already ingested, carry on")
+and can't do anything useful with a generic 400. Same reasoning as the separate
+CLI exit codes in Phase 1.
+
+### One error shape everywhere
+
+Every non-2xx returns `{"detail": "..."}`. One shape means a consumer writes one
+error path instead of one per endpoint. There's a test that walks several error
+routes and asserts the body has exactly that one key.
+
+### The engine has to arrive by injection, including on the write path
+
+Caught this when the ingest tests all failed with "no such table". The handler
+was calling `get_engine()` directly instead of taking it as a dependency, so
+FastAPI's `dependency_overrides` couldn't reach it, and the write path was
+pointed at the real configured database while the reads used the test one.
+
+In a test that's a confusing failure. In production it's writes and reads
+disagreeing about which database they're using, with nothing complaining. Fixed
+by adding an `EngineDep` and injecting it like everything else.
+
+### Contract tests validate against the published document, not my expectations
+
+FastAPI generates the OpenAPI doc from the response models, so in theory they
+agree by construction. In practice the gap opens when a handler returns something
+FastAPI coerces, or a field is null in reality and non-nullable in the schema,
+or an error path returns a shape nobody declared. That gap is exactly what breaks
+a generated client.
+
+So the tests pull each response schema out of `/openapi.json` and validate real
+responses against it with `jsonschema`.
+
+**And there's a test that the tests aren't a no-op.** This mattered. My first
+attempt registered the spec at the wrong base URI and every `$ref` dangled. That
+version happened to raise, which is lucky, because a *subtly* wrong base gives
+you a validator that resolves nothing, accepts everything, and reports a
+beautiful green contract suite that checks precisely zero things. So there's a
+test that feeds the validator a deliberately broken payload and insists it
+complains. A test tool whose own contract tests are decorative would be a bad
+look in an interview and worse in real life.
+
+Two schema details get their own assertions because they're the most likely to
+break a generated client: `pass_rate` must be declared nullable (an all-skipped
+test really does return null), and `flake_evidence` must serialise as an array of
+strings rather than leaking the tuple it is internally.
+
+### Config is read once per process
+
+Flake thresholds change the meaning of every number the API returns. If they were
+re-read per request, two calls in the same second could answer the same question
+differently after someone edited a file. Restarting to pick up a config change is
+the honest behaviour.
+
+### `py.typed` was missing and nothing told me
+
+`testpulse-core` had no `py.typed` marker, so as soon as `testpulse-api` imported
+it, mypy treated the whole package as untyped and silently stopped checking any
+of those calls. A strict-mode library that ships no marker is a library whose
+types nobody downstream can use. Added to both packages.
+
+### Left open after Phase 3
+
+- No auth on `/api/ingest`.
+- The API 500s with a raw SQL error if the database is behind on migrations. It
+  should check the alembic version at startup and refuse to serve, rather than
+  failing per-request with something unreadable. Hit this myself with a stale
+  local database.
+- No pagination on the timeline in test detail; it's capped at 500 points and
+  that's it.
+- No caching. Every metrics request recomputes the window from raw rows.
