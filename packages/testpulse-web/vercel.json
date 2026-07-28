@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "//": "The API is proxied under the same origin, exactly as the Vite dev server and the nginx container do. Three environments, one set of paths, and no CORS configuration anywhere.",
+      "source": "/api/:path*",
+      "destination": "https://testpulse-api.fly.dev/api/:path*"
+    },
+    {
+      "//": "Client-side routing. test_ids contain slashes, so deep links have many segments and every one of them has to fall through to the app rather than 404.",
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

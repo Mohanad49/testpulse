@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 
+from testpulse_api.auth import INGEST_KEY_ENV, configured_keys
 from testpulse_api.routers import ingest, suites
 
 DESCRIPTION = """
@@ -20,7 +23,33 @@ Two things worth knowing before consuming this API:
 """
 
 
+class InsecureConfigurationError(RuntimeError):
+    """Raised when a production instance would accept unauthenticated writes."""
+
+
+def _check_write_auth() -> None:
+    """Refuse to boot a public instance with an open write endpoint.
+
+    A guard rather than a warning. A warning in a startup log on a deployed
+    service is a warning nobody reads, and the failure mode it is protecting
+    against - anyone on the internet being able to write to the database that
+    every metric is computed from - is not one to leave to vigilance.
+
+    Gated on TESTPULSE_ENV so local use and docker-compose stay frictionless.
+    """
+    if os.environ.get("TESTPULSE_ENV", "").lower() not in {"production", "prod"}:
+        return
+    if not configured_keys():
+        raise InsecureConfigurationError(
+            f"TESTPULSE_ENV is production but {INGEST_KEY_ENV} is empty. "
+            "POST /api/ingest would accept unauthenticated writes from anyone "
+            "who can reach this service. Set at least one key, or unset "
+            "TESTPULSE_ENV for local use."
+        )
+
+
 def create_app() -> FastAPI:
+    _check_write_auth()
     app = FastAPI(
         title="TestPulse API",
         version="0.1.0",

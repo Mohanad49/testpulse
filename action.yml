@@ -28,6 +28,12 @@ inputs:
       runner. Point this at a shared Postgres for anything real.
     required: false
     default: ""
+  ingest-key:
+    description: >
+      Bearer token for the ingest endpoint. Required against any deployed
+      instance; a local SQLite database needs none.
+    required: false
+    default: ""
   dashboard-url:
     description: Linked from the PR comment.
     required: false
@@ -87,6 +93,7 @@ runs:
       shell: bash
       env:
         TESTPULSE_DATABASE_URL: ${{ inputs.database-url }}
+        TESTPULSE_INGEST_KEY: ${{ inputs.ingest-key }}
       run: |
         set -o pipefail
         ARGS=(--format "${{ inputs.format }}" --path "${{ inputs.path }}" --suite "${{ inputs.suite }}"

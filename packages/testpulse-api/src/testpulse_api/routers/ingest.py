@@ -21,6 +21,7 @@ from testpulse_core.parsers import ParseError, UnknownFormatError, available_for
 from testpulse_core.storage.db import session_scope
 from testpulse_core.storage.repository import DuplicateRunError, store_run
 
+from testpulse_api.auth import IngestAuth
 from testpulse_api.deps import EngineDep
 from testpulse_api.schemas import IngestResponseSchema
 
@@ -129,6 +130,7 @@ def _locate_report(root: Path, format_name: str) -> Path:
 )
 async def ingest(
     engine: EngineDep,
+    _auth: IngestAuth,
     file: Annotated[UploadFile, File(description="A report file, or a .zip of one.")],
     suite: Annotated[str, Form()],
     format_name: Annotated[str, Form(alias="format")],
@@ -145,10 +147,10 @@ async def ingest(
     posts, and any divergence between the two would show up as a bug report about
     the tool disagreeing with itself.
 
-    No authentication. That is a real gap and not an oversight: this writes to the
-    database and anyone who can reach it can write to it. It is acceptable while
-    the service runs locally or behind something else that authenticates, and it
-    must be closed before the instance is public.
+    Requires ``Authorization: Bearer <key>`` when ``TESTPULSE_INGEST_KEYS`` is
+    set. Open when it is not, so the CLI and a local docker-compose need no
+    secret to try the tool out - and the app refuses to start in production mode
+    without keys, so "open" cannot quietly become the state of a public instance.
     """
     try:
         parser = get_parser(format_name)
