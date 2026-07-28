@@ -1,219 +1,216 @@
 # Decisions
 
-> **This is a draft, not the finished document.**
->
-> The rule for this repo is that these entries get written in my own words, and
-> that if I can't write one, I don't understand the phase yet. This draft exists
-> so I'm editing rather than staring at a blank file — but reviewing prose I
-> didn't write feels like understanding and isn't, which is the exact failure the
-> rule was meant to prevent.
->
-> Each entry ends with a **Defend this** question that is deliberately left
-> unanswered. Answering those in my own words, and rewriting the entries in my
-> own voice, is what makes this document real. Until then, treat every claim
-> below as "the code does this", not as "I can argue for this".
+Notes on why TestPulse is built the way it is. I'm writing these as I go, one
+section per phase, because six months from now I won't remember why any of this
+looked like a good idea.
+
+Rule I'm following: if I chose something, I write down what I *didn't* choose and
+what it costs me. A decision with no rejected alternative isn't a decision, it's
+just the first thing I typed.
 
 ---
 
 ## Phase 1 — Ingestion and storage
 
-### 1. Parsers never touch the database
+### Parsers don't know the database exists
 
-Parsers are pure functions of the filesystem: a path and some CI metadata go in,
-plain dataclasses come out. A separate repository module maps those dataclasses
-onto SQLAlchemy entities.
+A parser takes a file path plus some CI metadata and hands back plain
+dataclasses. Nothing else. The mapping onto SQLAlchemy rows happens in
+`storage/repository.py`, which is the only file that knows both worlds.
 
-**Alternative rejected:** parsers constructing ORM objects directly. It removes
-one mapping function, and in exchange every parser test needs a live session and
-a schema, and the storage shape can no longer change without touching parser
-code.
+The other option was letting parsers build ORM objects straight away. One less
+mapping function to write. But then every parser test needs a database session
+and a schema, and I can't change the storage layout later without editing four
+parsers. Since I already know Phase 2 wants extra indexes and probably some
+denormalised columns, that trade wasn't close.
 
-**Cost accepted:** two model layers that have to be kept in sync by hand.
+What it costs: two model layers I have to keep in sync by hand. If they drift,
+nothing catches it automatically. I'm accepting that for now because there are
+only about a dozen fields.
 
-**Defend this:** at what size does the duplicated model layer stop being worth
-it, and what would the first symptom of that be?
+### test_id is `file::class::name`, and I strip line numbers out of it
 
----
+This is the single most important thing in Phase 1. Every metric in Phase 2 joins
+on `test_id`, so if it isn't stable across runs, none of the rest works.
 
-### 2. `test_id` is `file_path::class::name`, with source positions stripped
+Playwright's Allure output identifies a test as
+`recruitment/recruitment.spec.ts:65:7`. Line and column. Which means if I add an
+import at the top of that file, every test below it gets a new identity and loses
+its entire history, on a run where nothing about those tests changed. So I strip
+any trailing `:line` or `:line:col`.
 
-This is the key that joins one test's results across runs, so everything in
-Phase 2 depends on it being stable.
+Two things I considered and dropped:
 
-Playwright embeds a source position in its identifiers
-(`recruitment/recruitment.spec.ts:65:7`). Inserting a line anywhere *above* a
-test changes that number, which would mint a new `test_id` and reset the test's
-history on a run where nothing about the test changed. So trailing `:line:col`
-is stripped.
+**Using the report's own ID.** Allure gives you a `historyId`. It's stable within
+one framework, but it's computed by each framework's adapter, so the same test
+gets a different hash if you switch runners. That's exactly the migration I did
+at work (Selenium to Playwright), and losing all history at that moment is the
+worst possible time to lose it.
 
-**Alternatives rejected:**
-- *Report-supplied identifiers* (Allure's `historyId`): computed differently by
-  each framework adapter, so they cannot join a suite's history across a change
-  of tooling — which is the exact scenario this project exists to serve.
-- *Fuzzy name matching*: silently merges genuinely distinct tests. A wrong merge
-  corrupts the metrics; a reset history only empties them. Empty is recoverable.
+**Fuzzy matching on names.** Tempting, and wrong. A bad merge joins two unrelated
+tests and silently corrupts the numbers. A reset history just shows an empty
+chart, and I can see that it's empty. Wrong data beats missing data at being
+dangerous.
 
-**Known limitation, not solved:** renaming a test, moving its file, or renaming
-its class strands the old history. The raw components are stored in their own
-columns so a future version can re-key existing rows without re-ingesting.
+Still broken: rename a test, move its file, or rename its class and the old
+history is orphaned. I'm storing `file_path`, `class_name` and `test_name` in
+their own columns as well as the composite, so a later version can re-key the
+existing rows without re-reading every report. Not doing it now.
 
-**Defend this:** if a team renames 200 tests in one refactor, what does the
-flakiness leaderboard show the next morning, and is that the right behaviour?
+### Four statuses, but I keep the original word too
 
----
+Everything normalises to passed / failed / skipped / error, and the source
+format's own wording goes into `raw_status` untouched.
 
-### 3. Four normalised statuses, with the original always preserved
+The line I'm drawing: **failed** means an assertion didn't hold. **error** means
+the test never got far enough to have an opinion. A dev fixes those differently
+(one is your code, one is usually your fixtures or your environment), so I'm not
+collapsing them. Allure's `broken` and JUnit's `<error>` are the same idea and
+land on the same value.
 
-Everything maps to `passed` / `failed` / `skipped` / `error`. The source
-vocabulary is kept verbatim in `raw_status`.
+Three mappings that are judgement calls, not facts:
 
-The line drawn: `failed` means an assertion did not hold; `error` means the test
-never reached a verdict. Teams respond differently to those two, so they stay
-apart. Allure's `broken` and JUnit's `<error>` are the same idea and map the
-same way.
+- Playwright `timedOut` → **failed**. A timeout is nearly always the app being
+  slow or stuck, and that's a product problem.
+- Playwright `interrupted` → **error**. Somebody killed the run. The test never
+  finished.
+- pytest `xpassed` → **error**. This one's arguable. The test didn't fail, so
+  "passed" is defensible. But an `xfail` marker on something that now works is a
+  stale marker nobody's noticed, and calling it a pass buries it.
 
-**Judgement calls, not facts:**
-- Playwright `timedOut` → `failed`. A timeout is usually a slow or stuck product,
-  which is a product failure.
-- Playwright `interrupted` → `error`. The run was killed; the test never got a
-  verdict.
-- pytest `xpassed` → `error`. The test did not fail, but a stale `xfail` marker
-  is a real problem, and recording it as a pass hides it.
+If someone pushes back on one of these in an interview it'll be `timedOut`, and
+I think I'd still defend it.
 
-**Defend this:** `timedOut → failed` is the one most likely to be challenged.
-What breaks in the metrics if it maps to `error` instead?
+### retry_count can be NULL, and NULL is not zero
 
----
+`NULL` = this format has no way to tell me about retries. `0` = it does, and
+there weren't any.
 
-### 4. `retry_count` is nullable, and `NULL` ≠ `0`
+I nearly defaulted everything to 0. Would have been a quiet disaster. Phase 2's
+best flake signal is "same commit, two different outcomes", and retries are the
+cheapest source of that. If JUnit reports 0 retries instead of "no idea", the
+strategy runs happily against JUnit data and finds nothing, and it looks like
+there are no flaky tests instead of like there's no evidence.
 
-`NULL` means the format cannot report retries. `0` means it can and there were
-none.
+Right now Playwright is the only format that answers. Allure technically records
+retries, but as separate result files sharing a `historyId`, which needs
+cross-file correlation. Pushed to Phase 2.
 
-This matters because Phase 2's high-precision flake strategy looks for one commit
-producing two different outcomes. Defaulting to `0` would let it conclude "this
-test was not retried" from a format that structurally cannot say — so the
-strategy would look like it was running on JUnit data while quietly finding
-nothing.
+One thing that falls out of this and I want to remember: Playwright only retries
+a test that didn't pass. So `retry_count > 0` **and** a final status of passed is
+proof, on its own, that one commit produced two different outcomes. No extra
+column needed to carry that forward.
 
-Currently: Playwright reports retries; JUnit, pytest-json-report and Allure do
-not. Allure *does* record retries, as separate result files sharing a
-`historyId`, but recovering that needs cross-file correlation and is Phase 2 work.
+### Re-ingesting the same file must not double the numbers
 
-**Defend this:** Playwright only retries a failing test, so `retry_count > 0`
-plus a passing final status proves same-run disagreement. Why is no extra field
-needed to carry that into Phase 2?
+Natural key is (suite, commit, environment, started_at). Ingesting a duplicate
+raises an error instead of quietly doing nothing, because "quietly did nothing"
+and "worked fine" look the same from a CI step, and I'd rather the pipeline tell
+me.
 
----
+`started_at` being in the key means a real re-run of the same commit is *not* a
+duplicate. It gets its own row. That's on purpose: Phase 2's same-commit strategy
+lives on exactly those repeated runs, and collapsing them would delete the signal
+I'm trying to detect.
 
-### 5. Ingest is idempotent, keyed on (suite, commit, environment, started_at)
+**I got this wrong first.** The original version had an `allow_duplicate=True`
+flag to store a second copy. It couldn't work, because the unique constraint
+forbids the exact thing the flag promised. Caught it when the test failed with an
+IntegrityError. Replaced it with `--replace`, which deletes the stored run and
+writes the new one, and is what you actually want when you re-upload a fixed
+artifact.
 
-Re-ingesting one artifact must not double every metric computed over it. A
-duplicate raises rather than being silently skipped, because an ingest that
-quietly does nothing is indistinguishable at the call site from one that worked.
+Hole I know about: if a report has no timestamps at all, the parser falls back to
+"now", so every ingest gets a different `started_at` and the duplicate check
+never fires. Formats without timestamps get no protection. Haven't solved it.
 
-Including `started_at` in the key means a **genuine re-run of the same commit is
-not a duplicate** — it gets stored as its own run. That is deliberate: Phase 2's
-same-commit flake strategy is built on exactly those repeated runs and would
-have nothing to read if they were collapsed.
+### Broken input gets rejected, not partly read
 
-**Alternative rejected:** an `allow_duplicate` flag that stored a second copy. It
-was in the first version of this code and could not work — the unique constraint
-forbids precisely what it promised. The operation actually wanted when
-re-ingesting a corrected artifact is `--replace`, which deletes the stored run
-first.
+If a file won't parse, I raise. I don't return the rows I managed to read.
 
-**Known weakness:** a report with no timestamps falls back to ingest time, so
-every ingest of it gets a distinct `started_at` and this check never fires.
-Formats without timestamps have no duplicate protection.
+The case that convinced me is truncated JUnit XML. JUnit says a test passed by
+*not* having a `<failure>` child element. So a file that got cut off halfway
+parses into a shorter suite where everything still standing looks green. A
+partial ingest there turns a failed upload into a clean run, which is about the
+worst thing this tool could do.
 
-**Defend this:** two CI jobs ingest the same artifact at the same moment and both
-pass the pre-check. What actually stops the double write, and why is the Python
-check still worth having?
+Same reasoning for an empty Allure directory being an error rather than an empty
+run. "The suite ran and had nothing to report" and "the results never got
+written" are different problems and they look identical from here, so I refuse to
+guess.
 
----
+The cost is real: one corrupt file in a 500-file Allure directory kills the whole
+ingest. I think that's the right side to err on for now.
 
-### 6. Malformed input is rejected, never partially salvaged
+### An Allure results folder is not one run
 
-A parse error raises instead of returning the results it managed to read.
+Found this by accident, which is the only reason I found it.
 
-The sharpest case is truncated JUnit XML. JUnit encodes "passed" as the *absence*
-of a `<failure>` child, so a file cut off mid-document parses into a shorter
-suite in which everything that survived looks green. A partial ingest there turns
-a broken upload into a clean run. The same logic makes an empty Allure directory
-an error: "the suite produced nothing" and "the results were never written" look
-identical and need different responses.
+I pointed the CLI at the real `allure-results` folder in my orangehrm-playwright
+repo to check the parser against something other than fixtures. It reported 124
+results. Then I ran a query and there were only **18 distinct tests** in there.
+About nine runs had piled up in that folder over a day, and the same test showed
+up as passed, failed, skipped and error inside what my parser was cheerfully
+calling a single run.
 
-**Defend this:** the trade is that one corrupt file in a 500-file Allure
-directory loses the whole run. When would you want the opposite, and what would
-you need to add to make partial ingest safe?
+Every other format here is one file, written once, at the end of a run. The file
+*is* the boundary. Allure has no boundary at all: the adapter drops one JSON file
+per test into a folder and nothing ever cleans it up unless CI does.
 
----
+So: detect it and warn, don't try to fix it. Splitting a folder into runs means
+deciding what separates two runs, and I don't have a good answer yet (a time gap?
+a repeated test name? both are guesses). That belongs with the metrics work. The
+warning at least means it can't happen silently.
 
-### 7. An Allure results directory is not a run boundary
+This has a knock-on for Phase 6 that I need to remember: the demo can't be seeded
+from a folder that's been accumulating locally, or the run-level numbers are
+meaningless. The CI workflows in my other repos need to clear the directory
+between runs first.
 
-Found by ingesting a real directory rather than by reasoning about it. The
-`allure-results` folder in the orangehrm-playwright repo held 124 result files
-but only **18 distinct tests** — roughly nine accumulated runs — and the same
-test appeared as passed, failed, skipped and error inside what the parser was
-calling one run.
+### Fixtures are real reporter output, never hand-written
 
-Every other format here is a file written once per run, so the file *is* the
-boundary. Allure has none: the adapter appends one file per test and nothing
-clears the directory unless CI does.
+Every fixture in `tests/fixtures/` is something a real tool actually emitted.
+Most captured from my existing suites; the rest generated by running a throwaway
+suite and keeping the reports as-is.
 
-**Decision:** detect and warn, do not split. Splitting means deciding what
-separates two runs — a time gap? a distinct test set? — and that decision belongs
-with the metrics work, not the parser. The warning means it cannot happen
-silently.
+Reason: a fixture I write by hand encodes the same assumptions as the parser I'm
+writing. It passes, and then the parser falls over on a real report. I've done
+this to myself before.
 
-**Defend this:** this makes the live demo's seed data unreliable if it comes from
-a locally accumulated directory. What has to change in the CI workflows of the
-other portfolio repos before their results are safe to ingest?
+Three things real files caught that I would not have thought of:
 
----
+1. **Allure attachments live inside steps, not on the result.** I checked all 270
+   real result files: zero had a top-level `attachments` entry, 47 had them
+   nested inside the step tree. Reading `document["attachments"]` gives you an
+   empty list for every single test and looks completely fine, because "no
+   screenshots" is a believable answer.
 
-### 8. Fixtures are real reporter output, not hand-written
+2. **Allure's `fullName` is a different format depending on which adapter wrote
+   it.** Playwright writes `spec.ts:65:7`, pytest writes
+   `pkg.Module.Class#test_name`. There's no parsing rule that handles both
+   without first guessing who produced the file. That's why identity comes from
+   the labels instead.
 
-Every fixture is genuine tool output — captured from existing suites where
-possible, and otherwise produced by executing a throwaway suite and keeping its
-reports verbatim.
+3. **pytest-json-report's `created` field is the END of the session.** It reads
+   like a start time and I used it as one. Caught it by comparing against a JUnit
+   report from the same pytest run: `created - duration` matched that report's
+   timestamp to six decimal places. Used as a start time it shifts every run
+   forward by however long the suite took, which you'd never notice on a fast
+   suite and would completely scramble a slow one.
 
-A fixture I write myself encodes the same assumptions as the parser I am testing,
-so it passes while the parser fails on real reports. Three findings came out of
-using real files, and none of them would have appeared otherwise:
+Point 3 only got caught because two reports of the same session existed. Most of
+this parser set has no second source to check against, which bothers me a bit.
 
-1. Allure attachments are nested inside steps. In 270 real results, **zero** had
-   a top-level attachment and 47 had them nested. Reading `document["attachments"]`
-   returns `[]` for every test and looks correct, because empty is plausible.
-2. Allure's `fullName` grammar differs by adapter — `spec.ts:65:7` from
-   Playwright, `pkg.Module.Class#test` from pytest — which is why identity comes
-   from labels instead.
-3. pytest-json-report's `created` is the session **end** time despite the name.
-   Verified by cross-checking against a JUnit report from the same session:
-   `created - duration` matched its timestamp to within microseconds. Used as a
-   start time it would shift every run forward by its own duration.
+### Nothing from the Blue Ribbon repo goes in here
 
-**Defend this:** finding (3) was caught by comparing two reports of one session.
-What else in this parser set has no independent source to check against, and how
-would you get one?
+`blue-ribbon-qa-automation` has real module names, test names and failure
+messages from work in it. None of that goes into a public repo, as fixtures or as
+demo seed data. Not negotiable, including later when the demo looks thin.
 
----
+### Left open after Phase 1
 
-### 9. `blue-ribbon-qa-automation` is excluded from fixtures and seed data
-
-That repo contains employer test names, module names and failure messages. None
-of it belongs in a public portfolio repository. This also constrains Phase 6: the
-live demo cannot be seeded from it.
-
-**Defend this:** nothing to defend. Don't relax this one later because the demo
-looks thin.
-
----
-
-## Still open going into Phase 2
-
-- Reconstructing Allure retries via `historyId` correlation.
-- Deciding what separates two runs inside one accumulated Allure directory.
-- Whether `finished_at` should stay an estimate for JUnit (currently
-  `started_at + summed test time`, which undercounts parallel runs).
+- Rebuilding Allure retry counts by correlating `historyId` across files.
+- Working out what actually separates two runs inside one accumulated folder.
+- JUnit's `finished_at` is currently `started_at + sum of test durations`, which
+  is wrong for anything running in parallel. It undercounts. Might not matter
+  until the duration charts exist.
