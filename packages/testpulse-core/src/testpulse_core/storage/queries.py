@@ -13,6 +13,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from testpulse_core.clustering import FailureCluster, cluster_failures
 from testpulse_core.config import FlakeConfig, NewlyFailingConfig
 from testpulse_core.metrics import Observation, TestMetrics, compute
 from testpulse_core.models import TestStatus
@@ -345,3 +346,30 @@ def test_history(
             )
         )
     return list(reversed(pairs))
+
+
+def suite_failure_clusters(
+    session: Session,
+    suite_name: str,
+    flake_config: FlakeConfig,
+    branch: str | None = None,
+    limit: int = 20,
+) -> list[FailureCluster]:
+    """Cluster every failure message in the suite's current window.
+
+    Windowed rather than all-history on purpose: a cluster from eight months ago
+    that nobody has seen since is not a problem anyone is working on, and letting
+    it sit at the top because it accumulated a big count would bury what is
+    breaking now.
+    """
+    run_ids = window_run_ids(session, suite_name, flake_config.window_size, branch)
+    if not run_ids:
+        return []
+
+    statement = select(TestResultRow.test_id, TestResultRow.failure_message).where(
+        TestResultRow.run_id.in_(run_ids),
+        TestResultRow.failure_message.is_not(None),
+        TestResultRow.status.in_(["failed", "error"]),
+    )
+    failures = [(test_id, message) for test_id, message in session.execute(statement).all()]
+    return cluster_failures(failures, limit=limit)
