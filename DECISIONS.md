@@ -618,3 +618,167 @@ types nobody downstream can use. Added to both packages.
 - No pagination on the timeline in test detail; it's capped at 500 points and
   that's it.
 - No caching. Every metrics request recomputes the window from raw rows.
+
+---
+
+## Phase 4 — Dashboard
+
+### I overrode most of what the design tool told me
+
+I ran the UI/UX skill on this and its headline answer was "Real-Time /
+Operations **Landing**" with a style called Exaggerated Minimalism:
+`clamp(3rem, 10vw, 12rem)` headings, massive whitespace, a light blue-and-amber
+palette. That is a marketing page for an ops product. It is close to the exact
+opposite of what this needs, which is a dense data display that gets read next to
+a terminal.
+
+I kept what was actually useful and threw out the rest:
+
+- **Kept** the developer-tool dark palette from its colour database (slate,
+  `#0f172a` background), which is right.
+- **Kept** its chart guidance, and one line from it shaped the whole phase — see
+  the timeline decision below.
+- **Rejected** the style and the layout. Density dial to 9, spacing scale down to
+  4px steps.
+- **Rejected** the typography too, though that one is closer. It suggested Fira
+  Code / Fira Sans, which is a genuinely fine dashboard pairing. I went with
+  Inter + JetBrains Mono because the brief names Linear and Vercel Analytics as
+  the target feel and that is their stack.
+
+Worth writing down because "I used the tool" and "I did what the tool said" are
+different things, and the second one is how you end up with a portfolio piece
+that looks like everyone else's.
+
+### The status timeline, and why colour is never the only channel
+
+This is the signature visual: one cell per run, oldest left, so a flake pattern
+reads without a single number.
+
+The line from the chart guidance that changed my approach: *differentiate by
+shape, not colour alone*. Obvious once stated, and I had not thought about it
+properly. Roughly one man in twelve has a colour vision deficiency, red/green is
+precisely the pair they cannot separate, and red/green is the first thing every
+test tool reaches for. So a strip of red and green cells is unreadable to a
+meaningful slice of the people it is for.
+
+Every cell therefore carries a glyph as well as a colour, and the glyphs are
+distinct in monochrome: `▍` passed, `✕` failed, `!` error, `–` skipped at half
+height. Screenshot it into a report, print it greyscale, or view it with
+deuteranopia and the pattern still reads.
+
+There is a third channel for one specific case. A test that failed and then
+passed on retry is the single most important cell in the whole visual, because
+it is same-commit flake evidence in one square. It is the same green as an
+ordinary pass, so it gets an outline as well, and its accessible name says
+"passed on retry" out loud.
+
+**Keyboard.** The strip is one composite widget with arrow-key navigation, not
+50 focusable buttons. Fifty tab stops to cross one table row would be a worse
+experience than no keyboard support at all.
+
+**No tooltip.** Detail appears in a fixed line below the strip. A hover tooltip
+on a 10px target is unusable with a trackpad and invisible to a screen reader.
+
+### Rows expand in place
+
+The leaderboard expands a row into its run history rather than opening a modal or
+navigating to a detail page. The actual job on that screen is comparing patterns
+between two flaky tests, and both alternatives hide one of the two things you are
+comparing.
+
+### Slowest is ranked by p95, not mean
+
+A test that usually takes 200ms and occasionally takes 40 seconds has an
+unremarkable mean and is the reason CI is slow. The mean is shown next to it so
+the gap is visible, and a p95 more than double the mean gets tagged "spiky",
+because that is a different problem from "slow" and needs a different fix.
+
+### Things real data broke that fixtures never would have
+
+I pointed it at the real ingested runs and immediately found four things:
+
+1. The pass-rate axis read **"00%"**. `width={44}` was clipping "100%".
+2. The duration axis wrapped to `1000m 0s` because I reused the full duration
+   formatter on the axis. Axes now get a one-unit compact format; the tooltip
+   keeps the precision.
+3. Every X tick read **"May 30"**. CI runs many times a day, so a date-only label
+   is a column of identical strings. It now checks the actual span of the data and
+   switches to clock time inside a day.
+4. The trend read `▼ −282012ms/run`, which is technically correct and useless.
+
+None of these show up on invented data with tidy round numbers spread over weeks.
+
+### The accessibility scan found two real bugs, and one thing that was not a bug
+
+axe runs in the component tests, and there is a test asserting axe reports
+violations on deliberately broken markup — same reasoning as the API contract
+tests. A green a11y suite proves nothing if the checker silently is not running.
+
+Scanning the actual running page found two things the component tests missed:
+
+**`aria-controls` was invalid, flagged critical.** I had used the `test_id` as an
+element id. A `test_id` looks like
+`leave/leave-management.spec.ts::Leave Management Tests::Apply for leave (or ...)`
+— spaces, slashes, colons, parentheses. Not a valid HTML id, so `aria-controls`
+pointed at nothing. Now uses the row index.
+
+**`--fg-subtle` failed contrast**, measuring 3.75:1 on the page background where
+4.5:1 is required. Lifted it. The consequence is that the "subtle" tier is now
+much closer to the "muted" tier than I designed it to be, and I am taking that
+trade: AA sets a floor on how quiet text is allowed to be, and hint text nobody
+can read is a bug rather than a design choice.
+
+**And one false alarm worth recording.** A scan appeared to show five contrast
+failures in light mode, reporting a dark-mode foreground against a light-mode
+background — a combination that cannot exist. It turned out to be a stale style
+recalculation caused by me flipping `data-theme` from the console instead of
+using the toggle. Setting the preference and reloading gave zero violations in
+both themes. I nearly "fixed" a bug that was not there, which would have meant
+changing a palette to satisfy a measurement artifact.
+
+Final state: **zero violations, 27 passes, in both themes**, on the real page
+with a row expanded.
+
+### No data-fetching library
+
+Ten read requests, no mutations, no cache invalidation. react-query would be more
+machinery than it removes at this size. The one thing that genuinely matters is
+aborting in-flight requests when the suite changes, because otherwise a slow
+response for the previous suite lands after a fast one for the new suite and
+silently renders the wrong data. That is about fifteen lines.
+
+### The suite lives in the URL
+
+Not in component state. The point of this tool is sending somebody a link to the
+flaky test you want them to look at, so every view has to be linkable and the
+back button has to work.
+
+### Seeding the demo, and an honest note about it
+
+The screenshots come from real runs of my own suites, not invented data. Getting
+there needed one piece of work worth admitting to.
+
+The `orangehrm-playwright` allure directory holds 124 result files that are
+really about 16 accumulated runs — the Phase 1 finding. To show trends I had to
+split it back into runs, which I did with a one-off seeding script that starts a
+new run whenever a test id it has already seen appears again (a test cannot
+execute twice in one run). That heuristic lives in the demo seeding, **not** in
+the parser, because it is a guess and the parser should not guess.
+
+It is not perfect: one recovered "run" spans an implausible wall-clock time
+because results interleaved across a gap, which is why one duration bar dwarfs
+the rest. That is an artifact of the reconstruction, not of the product, and the
+right fix is CI clearing the results directory between runs.
+
+### Left open after Phase 4
+
+- The bundle is ~640KB (190KB gzipped), most of it Recharts. Fine for a
+  dashboard behind a login, worth code-splitting before it is a public demo.
+- No virtualisation on the tables. At a few hundred tests that is fine; at ten
+  thousand it will not be.
+- The quarantine view is read-only. Adding and removing is CLI-only, which is
+  defensible (quarantine is a deliberate act with a name attached) but it does
+  mean a round trip to a terminal.
+- No E2E test of the dashboard itself. Playwright against the running app is
+  Phase 5 work, and there is a pleasing symmetry in this project's own dashboard
+  being tested by the tool the dashboard reports on.

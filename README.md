@@ -2,9 +2,9 @@
 
 Test observability and flake detection for CI test suites.
 
-> **Status: Phase 3 of 6.** Ingestion, storage, metrics, flake detection and a
-> REST API. The dashboard is not built yet. This README is a placeholder; the full
-> case study is written in Phase 6.
+> **Status: Phase 4 of 6.** Ingestion, storage, metrics, flake detection, a REST
+> API and the dashboard. CI integration and deployment are next. This README is a
+> placeholder; the full case study is written in Phase 6.
 
 ## The problem
 
@@ -105,6 +105,27 @@ would be the obvious alternative and is unreliable — proxies commonly normalis
 `POST /api/ingest` has **no authentication**. It writes to the database. Run it
 locally or behind something that authenticates until that is fixed.
 
+## Dashboard
+
+```bash
+cd packages/testpulse-web && pnpm install && pnpm dev
+```
+
+React + Vite + TypeScript + Tailwind, Recharts for charts. Dark by default with a
+light toggle. Five views: suite overview, flakiness leaderboard, slowest tests,
+failure clusters, quarantine, plus per-test detail.
+
+**The status timeline is the piece worth looking at.** One cell per run, oldest
+first, so a flake pattern reads at a glance. Colour is never the only channel —
+every cell carries a distinguishable glyph, because red/green is exactly the pair
+a colourblind user cannot separate and it is the pair every test tool reaches for
+first. A pass that only happened after a retry gets a third channel, an outline,
+because that single cell is same-commit flake evidence on its own.
+
+Accessibility is enforced, not assumed: axe runs in the component tests, and one
+test asserts axe reports violations on broken markup so a green suite means
+something. Verified against the running app in both themes: zero violations.
+
 ## Design notes
 
 The reasoning behind the schema, the identity scheme and the parser behaviour is
@@ -132,6 +153,8 @@ uv run --directory packages/testpulse-api pytest
 uv run mypy --strict packages/testpulse-core/src
 uv run mypy --strict packages/testpulse-api/src
 uv run ruff check .
+
+cd packages/testpulse-web && pnpm test && pnpm typecheck
 ```
 
 The API's contract tests validate real responses against the generated
@@ -148,6 +171,5 @@ provenance.
 
 ## Not built yet
 
-Phase 4 dashboard · Phase 5 GitHub Action and CI · Phase 6 deployment and case
-study. Known gaps are listed at the end of each section in
+Phase 5 GitHub Action and CI · Phase 6 deployment and case study. Known gaps are listed at the end of each section in
 [DECISIONS.md](DECISIONS.md).
