@@ -111,7 +111,7 @@ The reasoning behind the schema, the identity scheme and the parser behaviour is
 in [DECISIONS.md](DECISIONS.md), including what was rejected and what is known to
 be wrong.
 
-Three things worth knowing before reading the code:
+Four things worth knowing before reading the code:
 
 - **`test_id` stability is the load-bearing decision.** Everything in Phase 2
   joins on it. Playwright embeds line numbers in its identifiers, so they are
