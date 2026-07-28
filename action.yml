@@ -26,12 +26,13 @@ inputs:
       Where to store results. Defaults to a local SQLite file, which is only
       useful for trying the action out - history cannot accumulate on a fresh
       runner. Point this at a shared Postgres for anything real.
-    required: false
-    default: ""
-  ingest-key:
-    description: >
-      Bearer token for the ingest endpoint. Required against any deployed
-      instance; a local SQLite database needs none.
+
+      KNOWN LIMITATION: this action writes to the database directly, so it needs
+      a database URL in CI. Handing every CI job a production database
+      credential is worse than handing it a scoped API key, and the right shape
+      is for the action to POST to /api/ingest with a bearer token instead. The
+      API endpoint and its auth exist; the CLI cannot yet target them. Until it
+      can, use a database that only holds test results and nothing else.
     required: false
     default: ""
   dashboard-url:
@@ -93,7 +94,6 @@ runs:
       shell: bash
       env:
         TESTPULSE_DATABASE_URL: ${{ inputs.database-url }}
-        TESTPULSE_INGEST_KEY: ${{ inputs.ingest-key }}
       run: |
         set -o pipefail
         ARGS=(--format "${{ inputs.format }}" --path "${{ inputs.path }}" --suite "${{ inputs.suite }}"
