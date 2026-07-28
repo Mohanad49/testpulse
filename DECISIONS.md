@@ -782,3 +782,155 @@ right fix is CI clearing the results directory between runs.
 - No E2E test of the dashboard itself. Playwright against the running app is
   Phase 5 work, and there is a pleasing symmetry in this project's own dashboard
   being tested by the tool the dashboard reports on.
+
+---
+
+## Phase 5 — CI integration
+
+### The PR comment reports changes, not state
+
+This is the whole design. A pull request comment gets about four seconds of
+attention from someone deciding whether to merge, and "47 tests failed" spends
+all four of them saying nothing useful — 45 of those were already failing on main
+and have nothing to do with the change under review.
+
+So the comment reports the diff: what started failing, what went flaky, what got
+slower, what recovered. Pre-existing failures are **counted and deliberately not
+listed**. Listing them is how the comment becomes a wall of red that everyone
+learns to scroll past, and then the two lines that mattered scroll past with it.
+
+Everything is computed against the window *excluding* the run being reported on.
+Include it and the run dilutes its own signal: one failure in a window of one is
+a 0% pass rate; one failure in a window of fifty barely moves.
+
+"Newly flaky" genuinely means newly. The classifier runs twice — once on the
+history, once on the history plus this run — and only a change between the two
+is reported. Flaky before and flaky now is not news.
+
+### The bug real output found
+
+I ran the report against the real ingested data and read what came out. It said:
+
+> 🔴 Started failing — `Delete a vacancy` — passed 0% of the last 8 runs
+
+Which is self-contradicting. A test that passed 0% of its last 8 runs did not
+start failing today. The cause: I was checking `prior[-1].is_failure` to decide
+whether a test was already broken, and the most recent entry in that test's
+history happened to be a **skip**. A skip is not a recovery, but it reset the
+judgement and a long-broken test got filed as a fresh regression.
+
+Now it looks at the last observation that actually *ran*. Two tests cover both
+directions — a skip must not hide a real new failure either.
+
+I would not have caught this from the unit tests I had written, because I wrote
+them against the behaviour I intended.
+
+### Duration regressions need a floor more than a ratio
+
+50% slower than the prior p95, and never for anything under 500ms.
+
+The floor is doing most of the work. Without it, a test going from 2ms to 6ms is
+a "200% regression" and the section fills with the fastest tests in the suite
+while the genuinely slow ones get truncated off the bottom. The 50% is loose on
+purpose too: CI runners vary that much between jobs, and a comment that fires on
+noise gets muted within a week. A muted comment is worse than no comment, because
+everyone still believes something is watching.
+
+### The action is composite, not Docker
+
+Docker actions only run on Linux runners and pay a container pull per job. The
+suites that would feed this run on macOS and Windows as well, so a Docker action
+would exclude exactly the platforms where cross-platform flakiness lives.
+
+Three behaviours worth defending:
+
+**Exit code 3 is success.** That is the "already ingested" code. Re-running a
+failed job should not fail because ingest correctly refused to write a duplicate.
+
+**The comment updates in place.** It carries a hidden HTML marker and the action
+looks for it before posting. Twenty stale bot comments on a long-lived PR is how
+a useful tool turns into noise people collapse by default.
+
+**`fail-on-new` defaults to false.** A tool that starts blocking merges the day
+it is installed gets uninstalled the day after. Adopt it, trust it, then turn the
+gate on.
+
+### TestPulse's own CI runs nightly, and that is not decoration
+
+The schedule exists because the same-commit flake strategy needs repeated runs of
+one unchanged SHA, and a push-only trigger never produces any. A suite that only
+runs when somebody pushes has no way to distinguish a flaky test from a broken
+one, which is precisely the problem this project exists to solve.
+
+Concurrency cancellation is enabled on pull requests and disabled on main and on
+the schedule. On a PR a superseded run is waste; on main every run is a data
+point the flake detection is counting.
+
+The E2E suite runs with `retries: 2` in CI. Not to paper over flakiness — to
+*produce* retry data, which is the one input the high-precision strategy can
+read. TestPulse ingesting its own Playwright report closes the loop: a tool that
+cannot detect flakes in its own test suite is not much of a tool.
+
+### Self-ingest only on main
+
+On a pull request the history would fill with runs from branches that may never
+merge, and the flake numbers would end up describing code nobody is running.
+
+### The E2E suite mocks nothing
+
+It drives the real dashboard against the real API over a seeded database. The
+component tests already cover components in isolation; a mocked API at this level
+would only prove the mock matches the mock. The seam between dashboard and API is
+the entire reason these tests exist.
+
+Seeded from the committed fixtures rather than generated data, so assertions can
+be exact. "Some tests are listed" passes on a broken page. "These tests are
+listed" does not.
+
+**And it immediately found a real bug.** Vite's `server.proxy` applies only to
+`vite dev`. The E2E suite runs against `vite preview`, which needs `preview.proxy`
+configured separately — without it every API call 404s and the suite is testing a
+broken application while looking like it works. Nothing in the unit tests or the
+manual browsing would ever have surfaced that, because both used the dev server.
+
+### Accessibility scans moved up a level
+
+Phase 4 had axe running over components. That stays, but the E2E suite now runs
+axe per view per theme against the fully rendered page — ten scans. Both real
+accessibility bugs found while building the dashboard (an invalid `aria-controls`
+and a contrast failure) were only visible at page level. Component scans cannot
+see landmark structure, heading order, or contrast against the real background.
+
+### Migrations are their own compose service
+
+Not the API's entrypoint. Two API replicas both running migrations at boot is a
+race, and an API that migrates on start cannot be scaled. As a one-shot service
+with `service_completed_successfully`, the API simply does not start until the
+schema is ready.
+
+The API waits on `pg_isready`, not on the container starting. Postgres accepts
+TCP connections several seconds before it will answer a query, so "the port is
+open" and "the database is ready" are different facts.
+
+### The Docker image runs as a non-root user
+
+This is the process that unpacks archives uploaded by callers. It is the one part
+of the system where being wrong about a path has consequences, and the four
+extraction guards are easier to trust with a uid that cannot write anything
+interesting.
+
+`psycopg` is an optional extra rather than a base dependency. Most CLI use is
+SQLite, and shipping a compiled driver to people who will never open a Postgres
+connection is cost with no benefit.
+
+### Left open after Phase 5
+
+- The action installs TestPulse from git rather than PyPI. Fine for a portfolio
+  piece, wrong for anything anyone else depends on — publishing is a Phase 6
+  decision.
+- `self-ingest` needs a `TESTPULSE_DATABASE_URL` secret to accumulate anything.
+  Without one it writes to a throwaway runner-local file and warns, which is
+  honest but useless. It becomes real when Phase 6 deploys a database.
+- No Playwright sharding. The suite is 21 tests and does not need it; the Cal.com
+  project will.
+- The Docker images are built in CI and never pushed. Also Phase 6.

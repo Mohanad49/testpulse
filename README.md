@@ -2,8 +2,8 @@
 
 Test observability and flake detection for CI test suites.
 
-> **Status: Phase 4 of 6.** Ingestion, storage, metrics, flake detection, a REST
-> API and the dashboard. CI integration and deployment are next. This README is a
+> **Status: Phase 5 of 6.** Ingestion, storage, metrics, flake detection, a REST
+> API, the dashboard, and CI integration. Deployment is next. This README is a
 > placeholder; the full case study is written in Phase 6.
 
 ## The problem
@@ -126,6 +126,41 @@ Accessibility is enforced, not assumed: axe runs in the component tests, and one
 test asserts axe reports violations on broken markup so a green suite means
 something. Verified against the running app in both themes: zero violations.
 
+## CI integration
+
+```yaml
+- uses: Mohanad49/testpulse@main
+  with:
+    path: ./playwright-report.json
+    format: playwright
+    suite: admin-portal-e2e
+    database-url: ${{ secrets.TESTPULSE_DATABASE_URL }}
+    dashboard-url: https://testpulse.example/suites/admin-portal-e2e
+```
+
+The action ingests the report and comments on the pull request with **what
+changed** — not what the state is. "47 tests failed" is useless in a PR because
+45 of them were already failing on main; "2 tests started failing" is the line
+that decides whether to merge. Pre-existing failures are counted and not listed.
+
+The comment updates in place rather than appending, `fail-on-new` is off by
+default (a tool that blocks merges on day one gets uninstalled), and an
+"already ingested" result is treated as success so re-running a job is safe.
+
+```bash
+testpulse report --suite admin-portal-e2e --fail-on-new   # exits 5 if worse
+```
+
+## Running the whole thing
+
+```bash
+docker compose up --build
+```
+
+Dashboard on `:8080`, API on `:8000`. Postgres, migrations, API and web, with
+migrations as their own one-shot service — an API that migrates on startup
+cannot be scaled, and two replicas racing to migrate is a bug waiting to happen.
+
 ## Design notes
 
 The reasoning behind the schema, the identity scheme and the parser behaviour is
@@ -155,6 +190,7 @@ uv run mypy --strict packages/testpulse-api/src
 uv run ruff check .
 
 cd packages/testpulse-web && pnpm test && pnpm typecheck
+pnpm e2e     # Playwright against the real dashboard, incl. axe per view per theme
 ```
 
 The API's contract tests validate real responses against the generated
@@ -171,5 +207,5 @@ provenance.
 
 ## Not built yet
 
-Phase 5 GitHub Action and CI · Phase 6 deployment and case study. Known gaps are listed at the end of each section in
+Phase 6 deployment and case study. Known gaps are listed at the end of each section in
 [DECISIONS.md](DECISIONS.md).
