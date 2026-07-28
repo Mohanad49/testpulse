@@ -92,6 +92,27 @@ class NewlyFailingConfig(BaseModel):
     were already mixed, that is a flaky test, not a new failure."""
 
 
+class ReportConfig(BaseModel):
+    """Thresholds for the PR comment.
+
+    A PR comment that cries wolf gets muted, and a muted comment is worse than no
+    comment because everyone believes it is still watching.
+    """
+
+    duration_regression_pct: float = Field(default=50.0, ge=0.0)
+    """How much slower than the prior p95 before a test is called a regression.
+    50% rather than something tighter because CI runners vary a lot between jobs
+    and a 20% gate would fire on noise every other run."""
+
+    duration_floor_ms: int = Field(default=500, ge=0)
+    """Tests faster than this are never reported as regressions, whatever the
+    ratio. This does more work than the percentage: without it a test going from
+    2ms to 6ms is a 200% regression and the report fills with the fastest tests
+    in the suite."""
+
+    max_items_per_section: int = Field(default=10, ge=1)
+
+
 class QuarantineConfig(BaseModel):
     default_expires_after_days: int = Field(default=14, ge=1)
     """Every quarantine entry gets an expiry so the list cannot quietly turn into
@@ -117,6 +138,7 @@ class Settings(BaseSettings):
     flake: FlakeConfig = FlakeConfig()
     newly_failing: NewlyFailingConfig = NewlyFailingConfig()
     quarantine: QuarantineConfig = QuarantineConfig()
+    report: ReportConfig = ReportConfig()
 
     @classmethod
     def settings_customise_sources(

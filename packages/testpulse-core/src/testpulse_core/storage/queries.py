@@ -14,9 +14,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from testpulse_core.clustering import FailureCluster, cluster_failures
-from testpulse_core.config import FlakeConfig, NewlyFailingConfig
+from testpulse_core.config import FlakeConfig, NewlyFailingConfig, ReportConfig
 from testpulse_core.metrics import Observation, TestMetrics, compute
 from testpulse_core.models import TestStatus
+from testpulse_core.report import RunReport, build_report
 from testpulse_core.storage.schema import TestResultRow, TestRunRow
 
 
@@ -373,3 +374,75 @@ def suite_failure_clusters(
     )
     failures = [(test_id, message) for test_id, message in session.execute(statement).all()]
     return cluster_failures(failures, limit=limit)
+
+
+def run_report(
+    session: Session,
+    suite_name: str,
+    flake_config: FlakeConfig,
+    newly_failing_config: NewlyFailingConfig,
+    report_config: ReportConfig,
+    run_id: int | None = None,
+    branch: str | None = None,
+) -> RunReport | None:
+    """Diff a run against the runs that came before it.
+
+    Defaults to the newest run for the suite. Returns None when there is nothing
+    stored, so a caller can tell "no data" from "no changes" — a PR comment
+    saying "nothing broke" when nothing was ingested at all would be a lie.
+
+    The history deliberately excludes the run being reported on. Including it
+    would let the run dilute its own signal: one failure in a window of one is a
+    0% pass rate, and one failure in a window of fifty barely registers.
+    """
+    target_id = run_id
+    if target_id is None:
+        statement = (
+            select(TestRunRow.id)
+            .where(TestRunRow.suite_name == suite_name)
+            .order_by(TestRunRow.started_at.desc())
+            .limit(1)
+        )
+        if branch is not None:
+            statement = statement.where(TestRunRow.branch == branch)
+        target_id = session.execute(statement).scalar_one_or_none()
+    if target_id is None:
+        return None
+
+    target = session.get(TestRunRow, target_id)
+    if target is None:
+        return None
+
+    current: dict[str, Observation] = {}
+    names: dict[str, str] = {}
+    for result in target.results:
+        current[result.test_id] = Observation(
+            run_id=target.id,
+            started_at=target.started_at,
+            status=TestStatus(result.status),
+            duration_ms=result.duration_ms,
+            commit_sha=target.commit_sha,
+            retry_count=result.retry_count,
+        )
+        names[result.test_id] = result.display_name
+
+    prior_ids = [
+        row_id
+        for row_id in window_run_ids(session, suite_name, flake_config.window_size + 1, branch)
+        if row_id != target_id
+    ]
+    history, prior_names = observations_by_test(session, prior_ids)
+    for test_id, name in prior_names.items():
+        names.setdefault(test_id, name)
+
+    return build_report(
+        suite_name=suite_name,
+        run_id=target.id,
+        commit_sha=target.commit_sha,
+        current=current,
+        history=history,
+        display_names=names,
+        flake_config=flake_config,
+        newly_failing_config=newly_failing_config,
+        report_config=report_config,
+    )
