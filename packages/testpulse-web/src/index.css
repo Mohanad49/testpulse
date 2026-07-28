@@ -1,0 +1,174 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/*
+  Design tokens.
+
+  Dark is the default and light is the toggle, not the other way round. This gets
+  looked at next to a terminal and a CI log, and a white page in that context is
+  the thing people close.
+
+  The palette is a slate-based developer-tool dark. Restrained on purpose: the
+  only saturated colour in the whole interface is status, so anything coloured
+  means something. A dashboard that decorates with colour has no colour left to
+  signal with.
+*/
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  /* Dense spacing scale. This is a data display, not a landing page: the goal is
+     to fit a run history on one screen without scrolling. */
+  --spacing: 0.25rem;
+
+  --radius-card: 0.5rem;
+
+  /* Motion. Everything is 150-220ms; anything slower reads as lag in a tool
+     people use dozens of times a day. */
+  --ease-out-quick: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0f172a;
+  --bg-subtle: #131c31;
+  --card: #1b2336;
+  --card-hover: #212b42;
+  --border: #2c3852;
+  --border-strong: #475569;
+
+  --fg: #f8fafc;
+  --fg-muted: #94a3b8;
+  /* Was #64748b, which measured 3.75:1 on --bg and 3.56:1 on --bg-subtle. Both
+     fail WCAG AA for body text. Lifted to clear 4.5:1 against the darkest
+     surface it is used on.
+
+     The consequence is that the "subtle" tier is less subtle than it was
+     designed to be, and the gap to --fg-muted is now narrow. That is the correct
+     trade: AA puts a floor on how quiet text is allowed to be, and hint text
+     nobody can read is not a design choice, it is a bug. */
+  --fg-subtle: #7d8ba3;
+
+  --accent: #38bdf8;
+  --accent-fg: #0f172a;
+
+  /* Status. Paired with a glyph everywhere they are used - see StatusCell.
+     Colour is never the only channel carrying meaning. */
+  --status-passed: #10b981;
+  --status-failed: #f43f5e;
+  --status-error: #f59e0b;
+  --status-skipped: #64748b;
+  --status-missing: #24304a;
+
+  --focus-ring: #38bdf8;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f8fafc;
+  --bg-subtle: #f1f5f9;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --fg: #0f172a;
+  --fg-muted: #475569;
+  --fg-subtle: #64748b;
+
+  --accent: #0284c7;
+  --accent-fg: #ffffff;
+
+  /* Darkened from the dark-mode values. The same green that reads well on
+     #0f172a fails contrast on white, and shipping one palette for both themes is
+     how a QA tool ends up failing its own accessibility scan. */
+  --status-passed: #047857;
+  --status-failed: #be123c;
+  --status-error: #b45309;
+  --status-skipped: #64748b;
+  --status-missing: #e2e8f0;
+
+  --focus-ring: #0284c7;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers are compared down a column constantly, so they get tabular figures.
+   Proportional digits make a column of durations impossible to scan. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One visible focus style everywhere. Never removed - a QA tool that cannot be
+   driven from the keyboard is not one to put in a portfolio. */
+:where(a, button, [role="button"], input, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-rise {
+  animation: fade-rise 200ms var(--ease-out-quick) both;
+}
+
+.skeleton {
+  background-color: var(--border);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
