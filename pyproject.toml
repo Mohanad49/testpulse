@@ -10,6 +10,10 @@ package = false
 
 [tool.uv.workspace]
 members = ["packages/*"]
+# testpulse-web is a pnpm package that happens to live under packages/. The glob
+# picks it up and uv then fails the whole workspace because it has no
+# pyproject.toml.
+exclude = ["packages/testpulse-web"]
 
 [tool.uv.sources]
 testpulse-core = { workspace = true }
