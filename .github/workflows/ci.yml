@@ -1,0 +1,246 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Nightly against an unchanged commit. This is not busywork: the same-commit
+    # flake strategy needs repeated runs of one SHA, and a push-only trigger
+    # never produces any. A suite that only runs when someone pushes has no way
+    # to tell a flaky test from a broken one.
+    - cron: "0 3 * * *"
+
+concurrency:
+  # Cancel superseded runs on a branch, but never on main or a schedule, where
+  # each run is a data point the flake detection is counting on.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+
+      - run: uv sync --frozen --all-extras
+
+      # Lint and type checks run before the tests and do not depend on them.
+      # They fail in seconds and a red build from a lint error should not cost a
+      # full test run to discover.
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: |
+          uv run mypy --strict packages/testpulse-core/src
+          uv run mypy --strict packages/testpulse-api/src
+
+      - name: Core tests
+        run: >
+          uv run --directory packages/testpulse-core pytest
+          --junitxml=junit-core.xml
+          --cov=testpulse_core --cov-report=xml --cov-report=term
+
+      - name: API tests
+        run: uv run --directory packages/testpulse-api pytest --junitxml=junit-api.xml
+
+      - name: Migrations round-trip
+        # A migration that only ever runs forwards is a migration nobody can
+        # roll back. Cheap to check, and the check only fails when it matters.
+        env:
+          TESTPULSE_DATABASE_URL: sqlite:///migration-check.db
+        working-directory: packages/testpulse-core
+        run: |
+          uv run --project .. alembic upgrade head
+          uv run --project .. alembic downgrade base
+          uv run --project .. alembic upgrade head
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-results
+          path: |
+            packages/testpulse-core/junit-core.xml
+            packages/testpulse-api/junit-api.xml
+            packages/testpulse-core/coverage.xml
+          retention-days: 30
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/testpulse-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: packages/testpulse-web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: packages/testpulse-web/dist
+          retention-days: 7
+
+  e2e:
+    name: E2E and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: packages/testpulse-web/pnpm-lock.yaml
+
+      - run: uv sync --frozen --all-extras
+      - run: pnpm install --frozen-lockfile
+        working-directory: packages/testpulse-web
+
+      - name: Seed a database from the committed fixtures
+        run: uv run python scripts/seed_e2e.py sqlite:///$PWD/e2e.db
+
+      - name: Start the API
+        env:
+          TESTPULSE_DATABASE_URL: sqlite:///${{ github.workspace }}/e2e.db
+        run: |
+          uv run uvicorn testpulse_api.main:app --port 8000 --log-level warning &
+          # Poll rather than sleep. A fixed sleep is either too short (flaky) or
+          # too long (wasteful), and this suite is supposed to be exemplary.
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:8000/health && break
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:8000/api/suites
+
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: packages/testpulse-web
+
+      - run: pnpm build
+        working-directory: packages/testpulse-web
+
+      # The axe scans live inside this suite, one per view per theme, so they
+      # run against the real rendered page rather than isolated components. Both
+      # accessibility bugs found while building the dashboard were only visible
+      # at that level.
+      - name: Playwright E2E, including axe
+        working-directory: packages/testpulse-web
+        run: pnpm e2e
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            packages/testpulse-web/playwright-report.json
+            packages/testpulse-web/junit-results.xml
+            packages/testpulse-web/test-results/
+          retention-days: 30
+
+  self-ingest:
+    name: Ingest our own results
+    runs-on: ubuntu-latest
+    needs: [backend, e2e]
+    # Only on main. On a pull request the history would be polluted with runs
+    # from branches that may never merge, and the flake numbers would end up
+    # describing code nobody is running.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e-results
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-results
+          path: backend-results
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --all-extras
+
+      # TestPulse watching its own suites. The Playwright report is the one that
+      # matters: it is the only format that reports retries, so it is the only
+      # one the same-commit strategy can read.
+      - name: Ingest
+        env:
+          TESTPULSE_DATABASE_URL: ${{ secrets.TESTPULSE_DATABASE_URL || format('sqlite:///{0}/self.db', github.workspace) }}
+        run: |
+          if [ -z "${{ secrets.TESTPULSE_DATABASE_URL }}" ]; then
+            echo "::warning::No TESTPULSE_DATABASE_URL secret set. Ingesting into a throwaway runner-local database, so no history accumulates."
+          fi
+          uv run testpulse ingest --format playwright \
+            --path e2e-results/playwright-report.json \
+            --suite testpulse-dashboard-e2e \
+            --commit "$GITHUB_SHA" --branch main --env chromium-ci \
+            --ci-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
+          uv run testpulse ingest --format junit \
+            --path backend-results/junit-core.xml \
+            --suite testpulse-core \
+            --commit "$GITHUB_SHA" --branch main --env python-ci || true
+
+      - name: Summarise
+        env:
+          TESTPULSE_DATABASE_URL: ${{ secrets.TESTPULSE_DATABASE_URL || format('sqlite:///{0}/self.db', github.workspace) }}
+        run: |
+          uv run testpulse report --suite testpulse-dashboard-e2e >> "$GITHUB_STEP_SUMMARY" || true
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Built, not pushed. Publishing is Phase 6; this job exists so a broken
+      # Dockerfile is caught on the PR that broke it rather than at deploy time.
+      - name: API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Compose config is valid
+        run: docker compose config -q
