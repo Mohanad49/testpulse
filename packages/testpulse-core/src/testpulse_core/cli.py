@@ -23,8 +23,9 @@ from testpulse_core.parsers import (
     available_formats,
     get_parser,
 )
+from testpulse_core.report import render_markdown
 from testpulse_core.storage.db import create_db_engine, session_scope
-from testpulse_core.storage.queries import list_suites, suite_metrics
+from testpulse_core.storage.queries import list_suites, run_report, suite_metrics
 from testpulse_core.storage.repository import DuplicateRunError, store_run
 
 app = typer.Typer(
@@ -274,6 +275,73 @@ def flaky(
 
     typer.echo(f"\n{len(found)} flaky test(s).")
     if fail_on_flaky:
+        raise typer.Exit(EXIT_FLAKY_FOUND)
+
+
+@app.command()
+def report(
+    suite: Annotated[str, typer.Option("--suite")],
+    run_id: Annotated[
+        int | None,
+        typer.Option("--run-id", help="Defaults to the newest run for the suite."),
+    ] = None,
+    branch: Annotated[str | None, typer.Option("--branch")] = None,
+    dashboard_url: Annotated[
+        str | None,
+        typer.Option("--dashboard-url", help="Linked from the comment."),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Write markdown here instead of stdout."),
+    ] = None,
+    fail_on_new: Annotated[
+        bool,
+        typer.Option("--fail-on-new", help=f"Exit {EXIT_FLAKY_FOUND} if anything got worse."),
+    ] = False,
+    database_url: Annotated[str | None, typer.Option("--database-url")] = None,
+) -> None:
+    """Summarise what changed in a run, as markdown for a PR comment.
+
+    Reports changes rather than state. "47 tests failed" is useless in a pull
+    request because 45 of them were already failing on main; "2 tests started
+    failing" is the only line that decides anything.
+    """
+    settings = get_settings()
+    engine = create_db_engine(database_url)
+    try:
+        with session_scope(engine) as session:
+            built = run_report(
+                session,
+                suite,
+                settings.flake,
+                settings.newly_failing,
+                settings.report,
+                run_id=run_id,
+                branch=branch,
+            )
+    finally:
+        engine.dispose()
+
+    if built is None:
+        # Distinct from "nothing changed". A comment claiming nothing broke when
+        # nothing was ingested at all would be a lie.
+        typer.secho(
+            f"No runs stored for suite {suite!r}, so there is nothing to compare.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+        raise typer.Exit(EXIT_USAGE)
+
+    markdown = render_markdown(
+        built, dashboard_url=dashboard_url, limit=settings.report.max_items_per_section
+    )
+    if output:
+        output.write_text(markdown)
+        typer.secho(f"Wrote {output}", fg=typer.colors.GREEN, err=True)
+    else:
+        typer.echo(markdown)
+
+    if fail_on_new and built.has_bad_news:
         raise typer.Exit(EXIT_FLAKY_FOUND)
 
 
