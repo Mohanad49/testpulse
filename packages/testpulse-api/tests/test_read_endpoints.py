@@ -226,3 +226,15 @@ def test_pass_rate_is_null_not_zero_for_an_all_skipped_test(client, engine):
     items = client.get("/api/suites/skips/tests").json()["items"]
     assert items[0]["pass_rate"] is None
     assert items[0]["scored_runs"] == 0
+
+
+def test_failure_clusters_group_by_root_cause(client, seeded):
+    clusters = client.get("/api/suites/admin-e2e/failures").json()
+    assert clusters, "seeded data has failures with messages"
+    assert clusters[0]["count"] >= 1
+    assert clusters[0]["representative"] == "boom"
+    assert clusters[0]["test_ids"]
+
+
+def test_failure_clusters_for_an_unknown_suite_is_404(client, seeded):
+    assert client.get("/api/suites/nope/failures").status_code == 404

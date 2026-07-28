@@ -131,6 +131,21 @@ class TestDetailSchema(BaseModel):
     )
 
 
+class FailureClusterSchema(BaseModel):
+    """A group of failures sharing one root cause."""
+
+    template: str = Field(
+        description="Normalised form: the shape of the problem with the varying parts removed."
+    )
+    count: int
+    representative: str = Field(
+        description="One real, unedited message. The template alone is not debuggable."
+    )
+    test_ids: list[str] = Field(
+        description="A cluster spanning many tests points at shared infrastructure."
+    )
+
+
 class QuarantineEntrySchema(BaseModel):
     suite_name: str
     test_id: str

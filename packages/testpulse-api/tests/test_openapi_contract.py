@@ -181,3 +181,9 @@ def test_the_validator_actually_rejects_a_wrong_payload(client, spec, seeded):
 
     broken = {**valid, "flaky_count": "not a number"}
     assert list(checker.iter_errors(broken)), "wrong type passed validation"
+
+
+def test_failure_clusters_response_matches_its_schema(client, spec, seeded):
+    assert_matches(
+        spec, client.get("/api/suites/admin-e2e/failures"), "/api/suites/{suite}/failures"
+    )

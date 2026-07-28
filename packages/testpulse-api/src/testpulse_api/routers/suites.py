@@ -11,6 +11,7 @@ from testpulse_core.storage import queries
 
 from testpulse_api.deps import ConfigDep, SessionDep
 from testpulse_api.schemas import (
+    FailureClusterSchema,
     PagedTestsSchema,
     QuarantineEntrySchema,
     QuarantineListSchema,
@@ -234,6 +235,36 @@ def get_quarantine(suite: SuiteName, session: SessionDep) -> QuarantineListSchem
         ],
         debt_count=len(quarantine_service.debt(entries)),
     )
+
+
+@router.get("/suites/{suite}/failures", response_model=list[FailureClusterSchema])
+def get_failure_clusters(
+    suite: SuiteName,
+    session: SessionDep,
+    config: ConfigDep,
+    branch: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[FailureClusterSchema]:
+    """Failure messages grouped by root cause, largest cluster first.
+
+    Forty failures from one broken selector should read as one problem. Grouping
+    is exact-match on a normalised template rather than fuzzy similarity: a false
+    merge hides a second bug inside a cluster that looks already explained, while
+    a false split just shows two rows a human immediately recognises as the same.
+    """
+    _require_suite(session, suite)
+    clusters = queries.suite_failure_clusters(
+        session, suite, config.flake, branch=branch, limit=limit
+    )
+    return [
+        FailureClusterSchema(
+            template=cluster.template,
+            count=cluster.count,
+            representative=cluster.representative,
+            test_ids=cluster.test_ids,
+        )
+        for cluster in clusters
+    ]
 
 
 @router.get("/suites/{suite}/tests/{test_id:path}", response_model=TestDetailSchema)
