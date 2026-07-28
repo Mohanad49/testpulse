@@ -11,6 +11,12 @@ dependencies = [
     "pydantic-settings>=2.7",
 ]
 
+[project.optional-dependencies]
+# Postgres driver kept out of the base install. Most CLI use is SQLite, and
+# shipping a compiled driver to people who will never open a Postgres connection
+# is a cost with no benefit. The Docker image installs this extra.
+postgres = ["psycopg[binary]>=3.2"]
+
 [project.scripts]
 testpulse = "testpulse_core.cli:app"
 

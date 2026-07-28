@@ -1,0 +1,169 @@
+name: TestPulse
+description: Ingest test results, then comment on the pull request with what changed.
+author: Mohanad Yehia
+
+# A composite action rather than a Docker action. Docker actions only run on
+# Linux runners and pay a container pull on every job; composite runs anywhere
+# Python does, which matters because the suites feeding this run on macOS and
+# Windows too.
+
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  path:
+    description: Report file, or the results directory for Allure.
+    required: true
+  suite:
+    description: Suite name. Must stay stable across runs or history does not join up.
+    required: true
+  format:
+    description: One of junit, playwright, pytest-json, allure.
+    required: true
+  database-url:
+    description: >
+      Where to store results. Defaults to a local SQLite file, which is only
+      useful for trying the action out - history cannot accumulate on a fresh
+      runner. Point this at a shared Postgres for anything real.
+    required: false
+    default: ""
+  dashboard-url:
+    description: Linked from the PR comment.
+    required: false
+    default: ""
+  comment:
+    description: Post a pull request comment. Ignored outside pull_request events.
+    required: false
+    default: "true"
+  fail-on-new:
+    description: >
+      Fail the step when something got worse. Off by default: a tool that starts
+      blocking merges the day it is installed gets uninstalled.
+    required: false
+    default: "false"
+  replace:
+    description: Overwrite a previously ingested run with the same natural key.
+    required: false
+    default: "false"
+  python-version:
+    required: false
+    default: "3.12"
+
+outputs:
+  run-id:
+    description: The stored run id.
+    value: ${{ steps.ingest.outputs.run-id }}
+  has-bad-news:
+    description: "true when something started failing, went flaky, or got slower."
+    value: ${{ steps.report.outputs.has-bad-news }}
+  markdown:
+    description: Path to the rendered comment.
+    value: ${{ steps.report.outputs.markdown-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install TestPulse
+      shell: bash
+      run: pipx install "testpulse-core @ git+https://github.com/Mohanad49/testpulse@main#subdirectory=packages/testpulse-core"
+
+    - name: Prepare database
+      shell: bash
+      env:
+        TESTPULSE_DATABASE_URL: ${{ inputs.database-url }}
+      run: |
+        if [ -z "${TESTPULSE_DATABASE_URL}" ]; then
+          echo "::warning::No database-url supplied. Using a runner-local SQLite file, so this run has no history to compare against."
+        fi
+
+    - name: Ingest results
+      id: ingest
+      shell: bash
+      env:
+        TESTPULSE_DATABASE_URL: ${{ inputs.database-url }}
+      run: |
+        set -o pipefail
+        ARGS=(--format "${{ inputs.format }}" --path "${{ inputs.path }}" --suite "${{ inputs.suite }}"
+              --commit "$GITHUB_SHA" --branch "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+              --ci-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
+        [ "${{ inputs.replace }}" = "true" ] && ARGS+=(--replace)
+
+        set +e
+        OUTPUT=$(testpulse ingest "${ARGS[@]}" 2>&1)
+        CODE=$?
+        set -e
+        echo "$OUTPUT"
+
+        # 3 is "already ingested". On a re-run of the same job that is the
+        # correct outcome and must not fail the build; anything else is real.
+        if [ $CODE -eq 3 ]; then
+          echo "::notice::This run was already ingested. Continuing."
+        elif [ $CODE -ne 0 ]; then
+          exit $CODE
+        fi
+
+        echo "run-id=$(echo "$OUTPUT" | grep -oE 'run [0-9]+' | head -1 | grep -oE '[0-9]+')" >> "$GITHUB_OUTPUT"
+
+    - name: Build report
+      id: report
+      shell: bash
+      env:
+        TESTPULSE_DATABASE_URL: ${{ inputs.database-url }}
+      run: |
+        set +e
+        testpulse report \
+          --suite "${{ inputs.suite }}" \
+          --output testpulse-comment.md \
+          ${{ inputs.dashboard-url && format('--dashboard-url "{0}"', inputs.dashboard-url) || '' }} \
+          --fail-on-new
+        CODE=$?
+        set -e
+
+        # 5 means something got worse. Whether that fails the build is the
+        # caller's decision, so it is recorded as an output either way.
+        if [ $CODE -eq 5 ]; then
+          echo "has-bad-news=true" >> "$GITHUB_OUTPUT"
+        elif [ $CODE -ne 0 ]; then
+          exit $CODE
+        else
+          echo "has-bad-news=false" >> "$GITHUB_OUTPUT"
+        fi
+        echo "markdown-path=testpulse-comment.md" >> "$GITHUB_OUTPUT"
+        cat testpulse-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const body = fs.readFileSync('testpulse-comment.md', 'utf8');
+          // A hidden marker so the comment is updated in place rather than a new
+          // one appended per push. Twenty stale bot comments on a PR is how a
+          // useful tool becomes noise people collapse by default.
+          const marker = `<!-- testpulse:${{ inputs.suite }} -->`;
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+
+          const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
+            .data.find((c) => c.body?.includes(marker));
+
+          const payload = `${body}\n${marker}`;
+          if (existing) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: payload });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: payload });
+          }
+
+    - name: Fail if something got worse
+      if: ${{ inputs.fail-on-new == 'true' && steps.report.outputs.has-bad-news == 'true' }}
+      shell: bash
+      run: |
+        echo "::error::TestPulse found new failures, newly flaky tests, or duration regressions."
+        exit 1

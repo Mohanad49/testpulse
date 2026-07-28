@@ -1,0 +1,66 @@
+# One command to bring up Postgres, the API and the dashboard:
+#
+#   docker compose up --build
+#
+# Then http://localhost:8080 for the dashboard and http://localhost:8000/docs
+# for the API.
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: testpulse
+      POSTGRES_PASSWORD: testpulse
+      POSTGRES_DB: testpulse
+    volumes:
+      - testpulse-db:/var/lib/postgresql/data
+    healthcheck:
+      # The API waits on this rather than on the container starting. Postgres
+      # accepts TCP connections several seconds before it will answer a query,
+      # so "the port is open" is not the same as "it is ready".
+      test: ["CMD-SHELL", "pg_isready -U testpulse -d testpulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      TESTPULSE_DATABASE_URL: postgresql+psycopg://testpulse:testpulse@db:5432/testpulse
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /app/packages/testpulse-core
+    # Migrations run as their own one-shot service rather than in the API's
+    # entrypoint. Two API replicas both running migrations at boot is a race,
+    # and an API that migrates on start cannot be scaled.
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      TESTPULSE_DATABASE_URL: postgresql+psycopg://testpulse:testpulse@db:5432/testpulse
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  testpulse-db:

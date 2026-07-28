@@ -5,6 +5,9 @@ description = "Test observability and flake-detection platform for CI test suite
 requires-python = ">=3.12"
 dependencies = ["testpulse-core", "testpulse-api"]
 
+[project.optional-dependencies]
+postgres = ["testpulse-core[postgres]"]
+
 [tool.uv]
 package = false
 
