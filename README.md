@@ -1,132 +1,167 @@
 # TestPulse
 
-Test observability and flake detection for CI test suites.
+**Test observability and flake detection for CI suites.** Ingests results over
+time, works out which tests are actually flaky rather than merely failing, and
+says what changed since the last run.
 
-> **Status: Phase 5 of 6.** Ingestion, storage, metrics, flake detection, a REST
-> API, the dashboard, and CI integration. Deployment is next. This README is a
-> placeholder; the full case study is written in Phase 6.
+[![CI](https://github.com/Mohanad49/testpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohanad49/testpulse/actions/workflows/ci.yml)
+
+---
 
 ## The problem
 
-A regression suite in CI has no memory across runs. A test that fails
-intermittently looks identical to one that just started failing. Nobody knows
-which tests are slowest, which are flakiest, or whether the suite is getting
-slower. TestPulse ingests results over time so those questions have answers.
+A regression suite in CI has no memory. Every run is judged in isolation, which
+means the two situations that need completely different responses look
+identical:
 
-## What works today
+- a test that fails intermittently because of a race condition
+- a test that started failing on Tuesday because someone broke it
 
-Four report formats parse into one schema and persist to SQLite or Postgres:
+Both show up as red. So the suite gets a retry bolted on, the red goes away, and
+the real bug ships. Or the test gets skipped "temporarily" and nobody ever
+un-skips it.
 
-| Format | Input | Reports retries |
-|---|---|---|
-| JUnit XML | file | no |
-| Playwright JSON reporter | file | **yes** |
-| pytest-json-report | file | no |
-| Allure results | directory | not yet |
+The information needed to tell them apart exists — it is just thrown away at the
+end of every run. TestPulse keeps it.
+
+I built this after spending a year on a QA team where "is that test flaky or did
+I break it?" was a question we answered by asking each other.
+
+## What it does
+
+```mermaid
+flowchart LR
+    subgraph Producers
+        A[JUnit XML]
+        B[Playwright JSON]
+        C[pytest-json-report]
+        D[Allure results]
+    end
+
+    A & B & C & D --> P[Parsers<br/>one normalised schema]
+    P --> DB[(SQLite / Postgres<br/>runs + results)]
+    DB --> M[Metrics engine<br/>pass rate · flip rate<br/>p95 · trends]
+    M --> F{Flake classifier}
+    F -->|same-commit| E1[near-proof]
+    F -->|rolling-flip| E2[inference]
+    M --> API[FastAPI]
+    API --> W[Dashboard]
+    API --> R[PR comment]
+    DB --> Q[Quarantine<br/>with expiry]
+```
+
+Four report formats in, one schema out, metrics computed over a rolling window,
+surfaced through a REST API, a dashboard and a pull-request comment.
+
+## The interesting part: two flake strategies, because one is not enough
+
+**`same-commit` — near-proof, low recall.** If one commit produced two different
+outcomes, the code did not change and the result did. Two sources: two runs of
+the same SHA disagreeing, or a single result that was retried and went green
+(runners only retry a test that did not pass). Almost no false positives. Finds
+nothing at all unless your suite retries or CI runs a commit twice.
+
+**`rolling-flip` — works anywhere, lower precision.** Flaky if pass rate is
+between 0.05 and 0.95 **and** flip rate exceeds 0.20, over at least 5 scored runs.
+
+Every threshold is doing a job:
+
+| Gate | Excludes |
+|---|---|
+| pass rate > 0.05 | Tests that always fail. Predictable ≠ flaky — that one is just broken |
+| pass rate < 0.95 | One unlucky failure in fifty runs. A bad night, not a pattern |
+| flip rate > 0.20 | **The one that matters.** A test that passed 30× then failed 20× has a pass rate of 0.6 — dead centre of the band — but flipped *once*. That is a regression with a specific cause, and calling it flaky sends someone hunting a race condition that does not exist |
+| ≥ 5 scored runs | Two runs, one pass one fail: pass rate 0.5, flip rate 1.0, clears everything. Far more likely a regression than a flake |
+
+Nothing is hardcoded. `testpulse.toml`, or `TESTPULSE_FLAKE__FLIP_RATE_THRESHOLD`
+and friends. "Is this flaky" is a policy question and two teams can reasonably
+disagree.
+
+### Reading the score
+
+`flakiness_score = flip_rate × 4p(1−p)`. The parabola peaks at a 50% pass rate
+and hits zero at both extremes, so an always-failing test scores 0. Multiplying
+by flip rate separates a coin-toss from a clean regression with the same pass
+rate.
+
+**It describes `rolling-flip` only.** A `same-commit` finding can legitimately
+score 0.00 — one run, retried, went green: pass rate 100%, flip rate 0. Sorting
+on the score alone put the most conclusively flaky test in the suite at the
+bottom of the leaderboard. That was a real bug, found by running real data
+through it.
+
+## The dashboard
+
+Dark by default, five views, and one piece of it worth looking at closely.
+
+**The status timeline** is one cell per run, oldest first, so a flake pattern
+reads without a number. The design constraint that shaped it: roughly one man in
+twelve has a colour vision deficiency, red/green is exactly the pair they cannot
+separate, and red/green is the first thing every test tool reaches for.
+
+So colour is never the only channel. Every cell carries a distinguishable glyph
+(`▍` passed, `✕` failed, `!` error, `–` skipped). Printed greyscale, screenshotted
+into a report, or viewed with deuteranopia, the pattern still reads. A pass that
+only happened after a retry gets a third channel — an outline — because that
+single cell is same-commit flake evidence on its own and must not look like an
+ordinary pass.
+
+Accessibility is enforced rather than assumed: axe runs in the component tests
+**and** per view per theme in the E2E suite, and one test asserts axe reports
+violations on broken markup so a green suite means something.
+
+## The PR comment reports changes, not state
+
+```
+## TestPulse
+⚠️ 1 newly failing in `orangehrm-e2e`.
+
+`7` tests · 4 passed · 3 failed · 0 errored · 0 skipped
+2 test(s) were already failing before this run and are not listed.
+
+🔴 Started failing
+- `Apply for leave (or verify leave balance status)` — passed 57% of its last 7 runs
+```
+
+"47 tests failed" is useless in a pull request because 45 of them were already
+failing on main. Pre-existing failures are counted and deliberately **not**
+listed — listing them is how the comment becomes a wall of red people scroll past.
+
+## Quarantine expires
+
+Quarantining is a recorded human decision with a name on it, not something the
+classifier does at 3am. Every entry expires after 14 days by default, and expiry
+does **not** re-enable the test or delete the entry. It just stops the list being
+quiet about age, so a quarantine list cannot silently become a graveyard of tests
+nobody remembers disabling.
+
+Overdue entries report *how* overdue. "Expired" is ignorable; "expired 47 days
+ago" is not.
+
+## Running it
+
+```bash
+docker compose up --build      # dashboard :8080, API :8000
+```
+
+Or piecemeal:
 
 ```bash
 uv sync
 cd packages/testpulse-core && uv run --project .. alembic upgrade head
 
-uv run testpulse ingest \
-  --format junit --path ./reports/junit.xml \
-  --suite admin-portal-e2e \
-  --commit "$GITHUB_SHA" --branch "$GITHUB_REF_NAME" --env chrome-ci
+uv run testpulse ingest --format junit --path ./reports/junit.xml \
+  --suite admin-portal-e2e --commit "$GITHUB_SHA" --branch main --env chrome-ci
+
+uv run testpulse flaky   --suite admin-portal-e2e            # with evidence
+uv run testpulse report  --suite admin-portal-e2e            # what changed
+uv run testpulse quarantine list --suite admin-portal-e2e --format pytest-deselect
+
+uv run uvicorn testpulse_api.main:app --reload                # API + /docs
+cd packages/testpulse-web && pnpm install && pnpm dev         # dashboard
 ```
 
-`testpulse formats` lists the parsers this build has. `testpulse info` prints the
-database it would write to.
-
-Then ask it what it found:
-
-```bash
-testpulse metrics --suite admin-portal-e2e        # per-test health, flakiest first
-testpulse flaky   --suite admin-portal-e2e        # just the flaky ones, with evidence
-testpulse flaky   --suite admin-portal-e2e --fail-on-flaky   # exits 5, for gating CI
-
-testpulse quarantine add  --suite admin-portal-e2e --test-id "..." --reason "..." --by you
-testpulse quarantine list --suite admin-portal-e2e --format pytest-deselect
-```
-
-### Flake detection
-
-Two classifiers run by default and they catch different things.
-
-**same-commit** is close to proof: one commit that produced two different
-outcomes. Either two runs of the same SHA disagreeing, or a single result that
-was retried and went green (runners only retry a test that did not pass). Almost
-no false positives, but it finds nothing unless your suite retries or CI runs a
-commit twice.
-
-**rolling-flip** needs neither. A test is flaky if its pass rate is between 0.05
-and 0.95 *and* its flip rate is above 0.20. The flip gate is the important one:
-a test that passed 30 times then failed 20 times has a pass rate of 0.6 but
-flipped exactly once, which is a regression with a cause, not a flaky test.
-
-Every threshold is config, never a literal in the code. Put a `testpulse.toml`
-next to the database or set `TESTPULSE_FLAKE__FLIP_RATE_THRESHOLD` and friends.
-
-### Quarantine
-
-Quarantining is a human decision that gets recorded, not something derived from
-the metrics automatically, and every entry expires (14 days by default). Expiry
-does not re-enable the test or delete the entry. It just stops the list being
-quiet about age, so a quarantine list cannot silently become a graveyard.
-
-Exit codes are distinct because a CI step needs to tell them apart: `2` the report
-could not be parsed, `3` this run was already ingested, `4` bad usage, `5` flaky
-tests were found. `3` is frequently fine and `2` never is; `5` means the suite ran
-and something in it is unreliable, which is not the same as a broken build.
-
-## API
-
-```bash
-uv run uvicorn testpulse_api.main:app --reload
-```
-
-Interactive docs at `/docs`, schema at `/openapi.json`.
-
-| Endpoint | |
-|---|---|
-| `GET /api/suites` | suites with stored runs |
-| `GET /api/suites/{suite}/runs` | recent runs, newest first |
-| `GET /api/suites/{suite}/health` | aggregate pass rate, flaky count, duration trend |
-| `GET /api/suites/{suite}/tests` | paginated, sortable by any metric |
-| `GET /api/suites/{suite}/tests/{test_id}` | metrics plus the full status timeline |
-| `GET /api/suites/{suite}/flaky` | flaky tests with the evidence that fired |
-| `GET /api/suites/{suite}/quarantine` | quarantined tests and quarantine debt |
-| `POST /api/ingest` | upload a report, or a `.zip` for Allure |
-
-Test detail is scoped under a suite because `test_id` is not globally unique, and
-uses a `:path` converter because real ids contain slashes. Percent-encoding them
-would be the obvious alternative and is unreliable — proxies commonly normalise
-`%2F` back to `/` before the app sees the request.
-
-`POST /api/ingest` has **no authentication**. It writes to the database. Run it
-locally or behind something that authenticates until that is fixed.
-
-## Dashboard
-
-```bash
-cd packages/testpulse-web && pnpm install && pnpm dev
-```
-
-React + Vite + TypeScript + Tailwind, Recharts for charts. Dark by default with a
-light toggle. Five views: suite overview, flakiness leaderboard, slowest tests,
-failure clusters, quarantine, plus per-test detail.
-
-**The status timeline is the piece worth looking at.** One cell per run, oldest
-first, so a flake pattern reads at a glance. Colour is never the only channel —
-every cell carries a distinguishable glyph, because red/green is exactly the pair
-a colourblind user cannot separate and it is the pair every test tool reaches for
-first. A pass that only happened after a retry gets a third channel, an outline,
-because that single cell is same-commit flake evidence on its own.
-
-Accessibility is enforced, not assumed: axe runs in the component tests, and one
-test asserts axe reports violations on broken markup so a green suite means
-something. Verified against the running app in both themes: zero violations.
-
-## CI integration
+In CI:
 
 ```yaml
 - uses: Mohanad49/testpulse@main
@@ -135,77 +170,111 @@ something. Verified against the running app in both themes: zero violations.
     format: playwright
     suite: admin-portal-e2e
     database-url: ${{ secrets.TESTPULSE_DATABASE_URL }}
-    dashboard-url: https://testpulse.example/suites/admin-portal-e2e
 ```
 
-The action ingests the report and comments on the pull request with **what
-changed** — not what the state is. "47 tests failed" is useless in a PR because
-45 of them were already failing on main; "2 tests started failing" is the line
-that decides whether to merge. Pre-existing failures are counted and not listed.
+Exit codes are distinct because that is all a pipeline reads reliably: `2`
+unparseable report, `3` already ingested, `4` bad usage, `5` something got worse.
+`3` is frequently fine and `2` never is.
 
-The comment updates in place rather than appending, `fail-on-new` is off by
-default (a tool that blocks merges on day one gets uninstalled), and an
-"already ingested" result is treated as success so re-running a job is safe.
+## Formats
 
-```bash
-testpulse report --suite admin-portal-e2e --fail-on-new   # exits 5 if worse
-```
+| Format | Input | Reports retries |
+|---|---|---|
+| JUnit XML | file | no |
+| Playwright JSON | file | **yes** |
+| pytest-json-report | file | no |
+| Allure results | directory | not yet |
 
-## Running the whole thing
-
-```bash
-docker compose up --build
-```
-
-Dashboard on `:8080`, API on `:8000`. Postgres, migrations, API and web, with
-migrations as their own one-shot service — an API that migrates on startup
-cannot be scaled, and two replicas racing to migrate is a bug waiting to happen.
-
-## Design notes
-
-The reasoning behind the schema, the identity scheme and the parser behaviour is
-in [DECISIONS.md](DECISIONS.md), including what was rejected and what is known to
-be wrong.
-
-Four things worth knowing before reading the code:
-
-- **`test_id` stability is the load-bearing decision.** Everything in Phase 2
-  joins on it. Playwright embeds line numbers in its identifiers, so they are
-  stripped — otherwise editing a line above a test resets its history.
-- **`retry_count` is nullable and `NULL` is not `0`.** `NULL` means the format
-  cannot report retries. Collapsing them would make same-commit flake detection
-  silently ineffective on formats that cannot answer.
-- **An Allure results directory is not a run boundary.** It accumulates. The
-  parser detects this and warns; it does not try to split it.
-- **`flakiness_score` only describes the rolling-flip strategy.** A same-commit
-  finding can score 0.00, so it can never be the only sort key.
+That column is the single most consequential thing on this page. `same-commit`
+detection needs retry data, and only one of these four provides it — which is why
+`retry_count` is nullable and `NULL` is not `0`. A format that *cannot* report
+retries must not look like one reporting none, or the strategy runs happily and
+finds nothing while appearing to work.
 
 ## Testing
 
 ```bash
-uv run --directory packages/testpulse-core pytest
-uv run --directory packages/testpulse-api pytest
-uv run mypy --strict packages/testpulse-core/src
-uv run mypy --strict packages/testpulse-api/src
+uv run --directory packages/testpulse-core pytest      # 217
+uv run --directory packages/testpulse-api  pytest      # 68
+uv run mypy --strict packages/testpulse-core/src packages/testpulse-api/src
 uv run ruff check .
 
-cd packages/testpulse-web && pnpm test && pnpm typecheck
-pnpm e2e     # Playwright against the real dashboard, incl. axe per view per theme
+cd packages/testpulse-web
+pnpm test        # 8 component + axe
+pnpm e2e         # 21 Playwright, incl. 10 axe scans (5 views × 2 themes)
 ```
 
-The API's contract tests validate real responses against the generated
-`/openapi.json`, and one test checks that those contract tests are not a no-op —
-a JSON Schema validator whose `$ref`s do not resolve accepts everything and
-reports a green suite that checked nothing.
+Two things I would want a reviewer to notice:
 
-Fixtures are real reporter output, captured from real suites or generated by
-running a throwaway one — never hand-written. A fixture written by hand encodes
-the same assumptions as the parser it tests, so it passes while the parser fails
-on real reports. See
-[tests/fixtures/README.md](packages/testpulse-core/tests/fixtures/README.md) for
-provenance.
+**Fixtures are real reporter output**, captured from real suites or produced by
+running a throwaway one. Never hand-written. A fixture I write encodes the same
+assumptions as the parser I am testing, so it passes while the parser fails on a
+real report. Using real files found three bugs immediately — including that Allure
+attachments live nested inside steps, not on the result (0 of 270 real results had
+a top-level attachment; 47 had nested ones), so the obvious implementation returns
+an empty list for every test and *looks* correct.
 
-## Not built yet
+**The meta-tests.** The OpenAPI contract suite has a test asserting the validator
+rejects a broken payload, and the accessibility suite has a test asserting axe
+reports violations on broken markup. A green suite is only evidence if the
+checker is demonstrably running — and my first contract-test implementation did
+silently resolve nothing.
 
-Phase 6 deployment and case study. Known gaps are listed at the end of each section in
-[DECISIONS.md](DECISIONS.md).
+## Design decisions
+
+[DECISIONS.md](DECISIONS.md) — one section per phase, every entry with the
+alternative rejected and what it costs. It also records what I got wrong:
+
+- an `allow_duplicate` flag the unique constraint made impossible
+- reading `pytest-json-report`'s `created` as a start time when it is the end
+- a long-broken test reported as newly failing because the last entry in its
+  history was a skip
+- concluding light-mode contrast was clean when it was not, because I trusted a
+  scan of a page I had hand-mutated from the console
+
+## Deployment
+
+`fly.toml` (API, scale-to-zero + managed Postgres) and `vercel.json` (dashboard,
+proxying `/api` to the same origin — same paths in dev, Docker and production, so
+there is no CORS configuration anywhere).
+
+`POST /api/ingest` requires `Authorization: Bearer <key>` when
+`TESTPULSE_INGEST_KEYS` is set, and **the app refuses to boot** when
+`TESTPULSE_ENV=production` and no key is configured. Reads stay open — the
+dashboard's whole purpose is being linkable.
+
+> **Not currently deployed.** The configs are written and the auth gap is closed,
+> but no live instance exists yet, so there is no demo link on this page. I would
+> rather have no link than one pointing at nothing.
+
+## What I would build next
+
+In rough order of what I would actually reach for first:
+
+1. **Make the action POST to the API.** It writes to the database directly today,
+   which means handing every CI job a production database credential — worse than
+   a scoped API key. The endpoint and auth exist; the CLI cannot target them yet.
+2. **Reconstruct Allure retries** by correlating `historyId` across result files.
+   That would let `same-commit` read Allure data, which is currently the largest
+   blind spot.
+3. **Split an accumulated Allure directory into runs.** The parser detects the
+   condition and warns; deciding what separates two runs is the hard part and I
+   did not want the parser guessing.
+4. **A materialised metrics table refreshed on ingest.** Every request recomputes
+   the whole window from raw rows. Fine at this size; the fix is not a cleverer
+   query.
+5. **Failure clustering by embedding rather than template match.** Exact template
+   matching biases hard toward splitting, which is the right default — a false
+   merge hides a second bug inside a cluster that already looks explained — but it
+   misses genuinely-same failures worded differently.
+
+## Layout
+
+```
+packages/testpulse-core   parsers, metrics, flake classifier, quarantine, CLI
+packages/testpulse-api    FastAPI over the stored data
+packages/testpulse-web    React dashboard
+action.yml                composite GitHub Action
+docker/                   API and web images
+scripts/seed_e2e.py       seeds a database from committed fixtures
+```

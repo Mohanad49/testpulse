@@ -977,3 +977,104 @@ expanded, so after the click the locator matched nothing. It now locates by
 That second one is the more useful mistake. A locator that depends on text the
 action itself changes is a test that passes when it is fast and fails when it is
 slow, which is precisely the class of flake this whole project exists to detect.
+
+---
+
+## Phase 6 — Deployment
+
+### Reads open, writes authenticated
+
+Not "the API needs auth". The two halves have opposite requirements.
+
+The read side is a dashboard whose entire purpose is being linkable — the point
+of the tool is sending someone the flaky test you want them to look at, and a
+login in front of that defeats it. The write side accepts a file, unpacks an
+archive and stores the result, and anyone who can reach it can pollute every
+metric the dashboard computes.
+
+So `POST /api/ingest` takes a bearer token and everything else stays open.
+
+Not OAuth, not JWT, no user model. The client is a CI job with a secret in its
+environment and exactly one permitted action. A token compared in constant time
+is correctly sized for that; anything more is machinery with no requirement
+behind it.
+
+Keys are a **list**, because rotating a single key means a window where either
+the old CI jobs or the new ones are broken. Add the new one, migrate, drop the
+old.
+
+### Open by default, but it cannot stay open in production
+
+No keys configured means no auth. That is deliberate — the CLI and a local
+`docker compose up` should not need a secret to try the thing out.
+
+The obvious risk is that "open" quietly becomes the state of a deployed instance.
+So `create_app()` **raises** when `TESTPULSE_ENV=production` and no keys are set.
+A guard, not a warning: a warning in a deployed service's startup log is a
+warning nobody reads, and the failure it protects against is anyone on the
+internet writing to the database every number is computed from.
+
+### The action still writes to the database directly, and that is wrong
+
+I noticed this while wiring the auth up. I had added an `ingest-key` input to the
+action, and then realised it did nothing — the action shells out to the CLI, and
+the CLI writes to the database. It never touches the API.
+
+An input that looks like it secures something and does not is worse than no
+input, so I removed it rather than leaving it there looking reassuring.
+
+The real problem it exposed: this action needs a **database URL** in CI. Handing
+every CI job a production database credential is strictly worse than handing it a
+scoped API key that can only append test results. The right shape is the action
+POSTing to `/api/ingest` with a bearer token. The endpoint exists and is now
+authenticated; the CLI cannot target it yet.
+
+That is recorded as the top item in "what I would build next" rather than quietly
+left. It is the most security-relevant known gap in the project.
+
+### Fly for the API, Vercel for the dashboard
+
+Fly because scale-to-zero with a managed Postgres is free-tier viable, and a
+portfolio demo that costs money every month is a portfolio demo that gets
+switched off in six weeks. `min_machines_running = 0` and the first request after
+a suspend pays a cold start, which is the correct trade for something nobody is
+paying for.
+
+Migrations run as a `release_command`, before new machines take traffic — the
+same reasoning as the compose setup. An app that migrates in its entrypoint
+cannot be scaled and two instances racing to migrate is a bug waiting.
+
+Vercel rewrites `/api` to the Fly app, so the dashboard talks to a same-origin
+path. That is now true in three environments — Vite dev proxy, nginx in Docker,
+Vercel rewrite — which means one set of paths and **no CORS configuration
+anywhere**. Worth the small duplication.
+
+### Nothing is actually deployed, and the README says so
+
+There is no live demo link on the README, because there is no live instance. I
+would rather ship a README with no link than one pointing at a 404 or, worse, a
+link that works today and rots.
+
+Deploying needs accounts and credentials that are mine to create, so it is a step
+I take rather than one that gets automated in a commit.
+
+### The README is a case study, not documentation
+
+It opens with the problem, not the feature list. It explains what each flake
+threshold excludes and why, rather than listing the thresholds. It shows the PR
+comment rather than describing it. And it has a section on what I got wrong.
+
+That last part is deliberate. Everything in this repo works, which is not
+interesting on its own — anyone can produce a green build. What is worth reading
+is which decisions were close, what they cost, and where real data contradicted
+what I had assumed. A README that only lists capabilities gives a reader no way
+to tell whether the person who wrote it understood any of it.
+
+### Left open after Phase 6
+
+- Actually deploying. Configs written, nothing running.
+- The action's database-direct write path (see above). Highest-priority gap.
+- No rate limiting on ingest. A valid key can post as fast as it likes.
+- Ingest keys have no scope: one key can write to any suite. Fine for one team,
+  wrong the moment two share an instance.
+- No `testpulse-core` release on PyPI, so the action installs from git.
