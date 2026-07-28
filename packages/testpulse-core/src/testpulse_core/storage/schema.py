@@ -114,3 +114,30 @@ class TestResultRow(Base):
     attachments: Mapped[str | None] = mapped_column(Text)
 
     run: Mapped[TestRunRow] = relationship(back_populates="results")
+
+
+class QuarantineRow(Base):
+    """A test somebody decided to stop trusting, and when that decision expires.
+
+    Quarantine is a stored human decision, not something derived from the flake
+    metrics on the fly. Auto-quarantining every test the classifier flags would
+    mean tests silently stop gating merges because a number crossed a threshold
+    at 3am, and nobody would be accountable for that. The classifier proposes;
+    a person decides.
+    """
+
+    __tablename__ = "quarantine"
+    __table_args__ = (
+        # One live entry per test per suite. Re-quarantining an already
+        # quarantined test should update the existing decision, not stack a
+        # second one with a different expiry.
+        UniqueConstraint("suite_name", "test_id", name="uq_quarantine_suite_test"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    suite_name: Mapped[str] = mapped_column(String(255))
+    test_id: Mapped[str] = mapped_column(String(1024))
+    quarantined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_after_days: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str | None] = mapped_column(Text)
+    quarantined_by: Mapped[str | None] = mapped_column(String(255))

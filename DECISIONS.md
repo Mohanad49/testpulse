@@ -214,3 +214,232 @@ demo seed data. Not negotiable, including later when the demo looks thin.
 - JUnit's `finished_at` is currently `started_at + sum of test durations`, which
   is wrong for anything running in parallel. It undercounts. Might not matter
   until the duration charts exist.
+
+---
+
+## Phase 2 — Metrics and flake detection
+
+### Every threshold lives in config, none of them in code
+
+`testpulse.toml` first, environment variables override it, defaults are in
+`config.py` with the reasoning written next to each one.
+
+This isn't a style thing. "Is this test flaky" is a policy question, not a fact.
+Two teams can look at the same numbers and disagree about where the line goes,
+and both can be right for their situation. A threshold hardcoded in a function is
+a policy that one team imposed on everyone and that nobody can find later when
+they want to argue with it.
+
+The order matters too: env beats file. CI needs to loosen a threshold for one job
+without touching a committed file, and the committed file needs to be the shared
+default everyone gets.
+
+### Why 0.05, 0.95 and 0.20
+
+These are the numbers I'll get asked about, so writing out the actual reasoning.
+
+**Lower bound 0.05.** A test that fails every single time is not flaky, it's
+broken. It's completely predictable. Putting it on a flakiness leaderboard buries
+the tests that are genuinely non-deterministic under a pile of tests that just
+need fixing.
+
+**Upper bound 0.95.** Over a 50-run window that's one failure. One failure in
+fifty is a bad night, not a pattern. Without this bound every test that ever
+hiccuped once shows up as flaky forever until the window rolls past it.
+
+**Flip rate 0.20.** This is the one that does the real work and it's the one I'd
+lead with. Take a test that passed 30 times and then failed 20 times in a row.
+Pass rate 0.6, sitting right in the middle of the band, so both bounds let it
+through. But it flipped exactly once out of 49 opportunities. That's not flaky,
+that's a regression with a specific cause somebody introduced on a specific
+commit, and calling it flaky sends someone hunting for a race condition that
+doesn't exist. The flip gate is what separates "intermittent" from "recently
+broke".
+
+### Two strategies, because each one is blind to what the other sees
+
+**Strategy A, same-commit disagreement.** If the same commit produced two
+different outcomes, the code didn't change and the outcome did. That's close to
+proof rather than inference. Two sources of it: two runs against one commit_sha
+that disagree, and a single result with `retry_count > 0` that ended up passing.
+The second one falls out of the Phase 1 decision to make `retry_count` nullable,
+and it's the reason that decision mattered. Runners only retry a test that didn't
+pass, so one passing result with retries means the same binary produced both
+outcomes minutes apart.
+
+Almost no false positives. Also finds nothing at all unless your suite retries or
+your CI runs the same commit twice, which is why it can't be the only one.
+
+**Strategy B, rolling flip rate.** Works on any suite with history, needs no
+retries and no repeated commits. Costs precision: a test failing because of a
+real intermittent bug in the product looks exactly the same as a badly written
+test from here. That's a limit of the approach, not something I can fix with a
+better threshold.
+
+Which strategies run is configurable, because running only A is a legitimate
+choice for a team that retries everything and doesn't want inference.
+
+### flakiness_score is `flip_rate * 4p(1-p)`
+
+Needed a single number to sort the leaderboard by. The `4p(1-p)` part is a
+parabola that peaks at 1.0 when the pass rate is 0.5 and hits 0 at both ends. So
+an always-failing test scores 0 no matter what, which is right, because it's
+predictable.
+
+Multiplying by flip rate separates two things that have the identical pass rate
+of 0.5 and are completely different problems: a test that alternates every run,
+and a test that passed 25 times then failed 25 times.
+
+It's a ranking aid, not a probability. Don't let anyone read it as one.
+
+### A same-commit finding can score 0.00, and that broke the sort
+
+Caught this when I ran the real Playwright report through it. The test that
+failed and passed on retry got flagged flaky by Strategy A, correctly, from a
+single run. Its pass rate was 100% and its flip rate was 0, so its flakiness
+score was exactly 0.00, so it sorted to the **bottom** of the leaderboard, below
+tests with no evidence against them at all.
+
+The score only describes Strategy B. It can't describe Strategy A, because
+Strategy A isn't a rate. So the sort is `is_flaky` first, then score. Obvious in
+hindsight and completely invisible until I put real data through it.
+
+### Minimum run count before Strategy B is allowed to speak
+
+Added after a test caught it firing on a two-run history. One pass and one fail
+gives pass rate 0.5 and flip rate 1.0, which sails through every threshold. But a
+test that has run twice and failed once is much more likely a regression somebody
+should look at than a flaky test to quarantine.
+
+Default is 5. Strategy A is deliberately not gated the same way, because its
+evidence doesn't get stronger with repetition. One same-commit disagreement
+already tells you everything.
+
+### Skipped results are dropped before every metric
+
+A skipped test didn't pass and didn't fail. Counting it either way is a lie, and
+counting it in the denominator is the worse lie: a test skipped for 40 of 50 runs
+would show a pass rate of 0.2 despite never having failed once.
+
+Related: an all-skipped test gets `pass_rate = None`, not 0. Zero would sort it
+next to tests that genuinely fail every time, which is a completely different
+situation.
+
+### Flip rate compares pass/not-pass, not the four statuses
+
+A test going from failed to error hasn't flipped in any way a human cares about.
+It failed both times, for a slightly different reason. Counting that as a flip
+would rank tests with unstable *failure modes* above tests that are actually
+non-deterministic, which is exactly backwards.
+
+### p95 uses nearest-rank, not interpolation
+
+The answer is always a duration some run really produced. On a 50-run window the
+p95 is the 48th value, and interpolating between two samples invents a number
+that never happened. "This test takes 4.2s at p95" is a lot easier to defend when
+some run really did take 4.2s.
+
+### is_newly_failing needs a spotless history
+
+Three conditions: a current failure streak of at least 2, at least 3 runs before
+that streak, and those earlier runs all passed.
+
+The last condition is what keeps this from overlapping with flakiness. If the
+history before the streak was already mixed, the test was flaky and has now
+tipped over, and that's a different conversation than "this broke on Tuesday".
+Two runs of a brand new test failing isn't a regression either, because there's
+nothing to regress from, which is what the minimum-prior-runs condition handles.
+
+### The window is counted in runs, not days
+
+A suite that runs 40 times on Monday and once on Saturday has wildly different
+amounts of evidence inside a seven-day window. Every threshold in the config is a
+fraction of runs, so if the denominator isn't runs the thresholds stop meaning
+anything consistent.
+
+Branch filtering is optional but usually what you want. Mixing a long-lived
+feature branch into main's history imports failures that were never main's
+problem, and you end up with flake numbers describing a branch nobody runs.
+
+### first_seen_at is not windowed
+
+"When did this test first appear" is a question about the test's whole life. If I
+answered it from the window, every long-standing test would look brand new the
+moment the window rolled past its origin.
+
+### Quarantine is a human decision, and it expires
+
+Two positions here, both arguable.
+
+**It's not automatic.** The classifier proposes candidates, a person records the
+decision, and their name goes on it. Auto-quarantining everything the classifier
+flags means tests silently stop gating merges because a number crossed a
+threshold at 3am and nobody is accountable for it. I've seen the version of this
+where nobody knows why a test is disabled and I'd rather it be somebody's call.
+
+**Everything expires, default 14 days.** A quarantine list without expiry turns
+into a graveyard. Tests get disabled during a bad week, the incident passes,
+and two years later there are sixty skipped tests and nobody knows whether the
+code they covered still works. The expiry deliberately does *not* delete the
+entry or re-enable the test. It just makes the list stop being quiet about age.
+That surfaced debt is the entire point of the feature.
+
+Days remaining is stored signed, so an overdue entry reports "expired 47 days
+ago" rather than just "expired". The number is what actually gets people to act.
+
+Re-quarantining resets the clock instead of adding a second row. That's a real
+decision being made a second time ("yes, still broken, another two weeks") and it
+should show as a new date.
+
+### The export formats, and where they lose
+
+`--format json` is the complete picture. The other two are for wiring into CI and
+both give something up.
+
+**pytest.** The brief called for markers. Markers turn out to be the wrong tool:
+a marker has to be written into the source file next to the test, so applying one
+from an external list means either editing test files from CI or writing a
+conftest hook that reads the list and rewrites collected items. `--deselect`
+takes a nodeid on the command line and needs nothing installed, so that's what I
+emit. What I give up: a deselected test vanishes from the report entirely, where
+a marked one could show as skipped-because-quarantined. If that visibility turns
+out to matter, the conftest hook is the upgrade path.
+
+There's also a case it can't handle at all. Our `test_id` is already nodeid
+shaped, but only when the report gave us a file path, and JUnit usually doesn't.
+Those come out as `::SomeClass::test_name`, which pytest can't deselect. I emit a
+comment line naming them rather than an argument that would fail quietly at
+collection time.
+
+**playwright.** Playwright greps on the test title, not a file path, so this can
+only use the name segment. Titles get regex-escaped because test names are full
+of brackets and parentheses, especially parametrised ones. The imprecision I
+can't avoid: two tests in different files with the same title are
+indistinguishable to a title regex, so quarantining one skips both. Worth knowing
+before anyone wires it into a pipeline.
+
+Also: an empty list has to produce an empty string, not an empty alternation. An
+empty regex in `--grep-invert` matches everything and skips the whole suite.
+There's a test pinning that.
+
+### Property tests, because I don't trust my own examples
+
+The example-based tests cover cases I thought of. The Hypothesis ones cover the
+ones I didn't. The important one is that a test which always passes is never
+classified flaky, under any strategy, for any length of history. If that ever
+breaks, every number this tool produces is suspect.
+
+The others are boundary invariants: rates stay in 0-1, the p95 is always a real
+observed duration, a test that never failed has no failure signals, and
+`is_newly_failing` always implies a current failure streak.
+
+### Left open after Phase 2
+
+- Allure retries still aren't reconstructed, so Strategy A can't use Allure data.
+  Needs `historyId` correlation across files.
+- Failure-message clustering (grouping 40 failures with one root cause) is listed
+  under the Phase 4 dashboard, but the clustering itself belongs down here in the
+  metrics layer. Will probably move it.
+- Nothing recomputes metrics incrementally. Every call recomputes the whole
+  window from raw rows. Fine at this size, will need caching before the API is
+  serving a dashboard.
