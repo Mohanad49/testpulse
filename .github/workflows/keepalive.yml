@@ -1,0 +1,51 @@
+name: Keepalive
+
+# GitHub disables scheduled workflows after 60 days with no new commit, and only
+# commits reset that timer - workflow runs, releases and issues do not. This
+# repository is meant to keep running unattended for years, so without this the
+# nightly schedule dies quietly about two months after the last push and nothing
+# announces it. The suite would simply stop producing data.
+#
+# Runs monthly and does nothing unless the repository has actually been quiet, so
+# in normal use it never commits at all.
+
+on:
+  schedule:
+    - cron: "0 4 1 * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Commit even if the repo is not quiet yet, to prove this works"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reset the inactivity timer if the repo has gone quiet
+        run: |
+          LAST_COMMIT=$(git log -1 --format=%ct)
+          AGE_DAYS=$(( ( $(date +%s) - LAST_COMMIT ) / 86400 ))
+          echo "Last commit was ${AGE_DAYS} day(s) ago."
+
+          # A safety net that cannot be exercised until the day it matters is not
+          # a safety net. `force` runs the real push path on demand, so this was
+          # verified working rather than assumed.
+          if [ "${{ inputs.force }}" != "true" ] && [ "$AGE_DAYS" -lt 45 ]; then
+            # 45 days: comfortably inside GitHub's 60-day window, leaving a whole
+            # extra monthly run of margin if one of these jobs is itself skipped.
+            echo "Recent enough. Nothing to do."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive so the scheduled workflow is not auto-disabled"
+          git push
+          echo "::notice::Pushed a keepalive commit after ${AGE_DAYS} quiet days."
