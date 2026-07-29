@@ -231,7 +231,11 @@ jobs:
         # Deployed from CI rather than from a Vercel git integration, because the
         # snapshot has to be generated *after* this run's results are ingested.
         # A build triggered by the push would run before any of that existed.
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        #
+        # The token is checked inside the step rather than in an `if:`. The
+        # secrets context is not available to step-level conditionals, and using
+        # it there does not fail loudly - it invalidates the whole workflow file,
+        # which GitHub reports only as "a workflow file issue" with no line.
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -239,6 +243,10 @@ jobs:
           VITE_DATA_MODE: static
         working-directory: packages/testpulse-web
         run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::notice::No VERCEL_TOKEN secret set, so the dashboard was not published. See DEPLOYMENT.md."
+            exit 0
+          fi
           npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
           npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
           npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
