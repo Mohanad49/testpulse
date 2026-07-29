@@ -24,6 +24,11 @@ export default defineConfig({
   // timed out anyway.
   preview: { proxy: API_PROXY, host: "127.0.0.1", port: 4173 },
   test: {
+    // Scoped to src/. Vitest's default glob also matches e2e/*.spec.ts, which
+    // are Playwright specs - and Playwright's test.describe() throws when it is
+    // called by a runner that is not Playwright. Two test runners in one package
+    // must not compete for the same files.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
