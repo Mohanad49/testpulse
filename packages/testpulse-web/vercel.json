@@ -5,7 +5,6 @@
   "framework": "vite",
   "rewrites": [
     {
-      "//": "Client-side routing. test_ids contain slashes so deep links have many segments, and every one has to reach the app rather than 404. /data is excluded because those are real files.",
       "source": "/((?!data/|assets/).*)",
       "destination": "/index.html"
     }
@@ -29,7 +28,6 @@
       ]
     },
     {
-      "//": "The snapshot is regenerated nightly, so a long cache would serve yesterday's data all day.",
       "source": "/data/(.*)",
       "headers": [
         {

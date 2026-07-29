@@ -121,6 +121,21 @@ should come back clean.
 
 ---
 
+## Notes on vercel.json
+
+Two things in there that are not obvious:
+
+- **The rewrite excludes `/data/` and `/assets/`.** Everything else falls through
+  to `index.html` because `test_id`s contain slashes, so a deep link to one test
+  has many path segments and every one of them has to reach the app rather than
+  404. `/data` and `/assets` are real files and must not be rewritten.
+- **`/data/` is cached for five minutes, not a year.** The snapshot is
+  regenerated nightly, and a long cache would serve yesterday's numbers all day.
+
+There are no `"//"` comment keys in that file. JSON has no comments, and Vercel
+validates the schema strictly — an unrecognised property fails the deploy with
+`should NOT have additional property`.
+
 ## What this does not deploy
 
 **The API is not hosted.** It is what a self-hosted install runs
