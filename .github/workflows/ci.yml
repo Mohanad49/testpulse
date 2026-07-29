@@ -193,6 +193,15 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen --all-extras
 
+      - name: Migrate the database
+        # Run here rather than left as a step somebody has to remember. A schema
+        # change that ships without its migration fails at ingest time, at 3am,
+        # in a scheduled run nobody is watching.
+        env:
+          TESTPULSE_DATABASE_URL: ${{ secrets.TESTPULSE_DATABASE_URL || format('sqlite:///{0}/self.db', github.workspace) }}
+        working-directory: packages/testpulse-core
+        run: uv run --project .. alembic upgrade head
+
       # TestPulse watching its own suites. The Playwright report is the one that
       # matters: it is the only format that reports retries, so it is the only
       # one the same-commit strategy can read.
