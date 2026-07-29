@@ -2,6 +2,10 @@
 
 FROM node:24-alpine AS builder
 WORKDIR /app
+# COREPACK_ENABLE_DOWNLOAD_PROMPT=0 because corepack asks before fetching a pnpm
+# version it does not already have, and a prompt in a non-interactive build is a
+# hang rather than a question.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 
 COPY packages/testpulse-web/package.json packages/testpulse-web/pnpm-lock.yaml ./

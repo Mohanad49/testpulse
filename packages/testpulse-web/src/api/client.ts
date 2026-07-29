@@ -10,12 +10,17 @@ import type {
 } from "./types";
 
 export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
+  // Declared and assigned explicitly rather than as a constructor parameter
+  // property. `erasableSyntaxOnly` is on in tsconfig.app.json, and a parameter
+  // property is TypeScript syntax that cannot be erased to valid JS - so it
+  // compiles under `tsc --noEmit` against the root config and fails under
+  // `tsc -b`, which is what the build actually runs.
+  readonly status: number;
+
+  constructor(status: number, message: string) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
   }
 }
 
