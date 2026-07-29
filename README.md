@@ -11,8 +11,10 @@ as a static snapshot. Read the
 [flakiness leaderboard](https://testpulse-eight.vercel.app/suites/testpulse-dashboard-e2e/flaky)
 first; it is the point of the whole project.
 
-The data comes from seven suites across five repositories, each on its own
-nightly schedule, all reporting through the composite action below:
+Five repositories are wired to report into it, each on its own nightly
+schedule, through the composite action documented below. A suite appears on the
+dashboard after its first nightly run, so the suite selector is the accurate
+record of what has landed:
 
 | Suite | Source | Stack |
 |---|---|---|
