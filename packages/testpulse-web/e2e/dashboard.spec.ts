@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 /**
@@ -26,6 +26,29 @@ test.describe("suite overview", () => {
   });
 });
 
+/**
+ * Expand the first leaderboard row and return its timeline cells, only once they
+ * actually exist.
+ *
+ * The expanded row fetches its own history, so the cells appear a tick after the
+ * click. `locator.count()` is the one method here that does NOT auto-wait - it
+ * answers immediately with whatever is in the DOM right now - so calling it
+ * straight after the click returned 0 whenever CI was a little slower than my
+ * laptop. It failed all three retries in CI and passed every time locally.
+ *
+ * Awaiting a visibility assertion first gives the auto-waiting back. Every test
+ * that needs these cells goes through here so the race cannot be reintroduced in
+ * one place and not another.
+ */
+async function expandFirstRowAndGetCells(page: Page) {
+  await page.locator('button[aria-controls="flaky-history-0"]').click();
+  const group = page.getByRole("group", { name: /run history/i }).first();
+  await expect(group).toBeVisible();
+  const cells = group.getByRole("button");
+  await expect(cells.first()).toBeVisible();
+  return cells;
+}
+
 test.describe("flakiness leaderboard", () => {
   test("lists flaky tests with the evidence that fired", async ({ page }) => {
     await page.goto(`/suites/${SUITE}/flaky`);
@@ -50,8 +73,7 @@ test.describe("flakiness leaderboard", () => {
 
   test("the timeline is keyboard navigable", async ({ page }) => {
     await page.goto(`/suites/${SUITE}/flaky`);
-    await page.locator('button[aria-controls="flaky-history-0"]').click();
-    const cells = page.getByRole("group", { name: /run history/i }).first().getByRole("button");
+    const cells = await expandFirstRowAndGetCells(page);
     await cells.first().focus();
     await page.keyboard.press("ArrowRight");
     await expect(cells.nth(1)).toBeFocused();
@@ -61,8 +83,7 @@ test.describe("flakiness leaderboard", () => {
 
   test("every timeline cell names its status in text, not only in colour", async ({ page }) => {
     await page.goto(`/suites/${SUITE}/flaky`);
-    await page.locator('button[aria-controls="flaky-history-0"]').click();
-    const cells = page.getByRole("group", { name: /run history/i }).first().getByRole("button");
+    const cells = await expandFirstRowAndGetCells(page);
     const count = await cells.count();
     expect(count).toBeGreaterThan(0);
     for (let i = 0; i < count; i++) {
