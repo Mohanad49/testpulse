@@ -283,7 +283,14 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VITE_DATA_MODE: static
-        working-directory: packages/testpulse-web
+        # Run from the repository root, NOT from packages/testpulse-web.
+        #
+        # The Vercel project has Root Directory set to packages/testpulse-web, and
+        # `vercel build` applies that itself. Running the command from inside that
+        # directory too makes it look for the output in
+        # packages/testpulse-web/packages/testpulse-web/dist - the build succeeds
+        # and then fails with "No Output Directory named dist found", which reads
+        # like a build problem and is not one.
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "::notice::No VERCEL_TOKEN secret set, so the dashboard was not published. See DEPLOYMENT.md."
@@ -291,7 +298,8 @@ jobs:
           fi
           npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
           npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
-          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN" > deploy-url.txt
+          echo "Deployed: $(cat deploy-url.txt)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarise
         env:
