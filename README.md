@@ -6,10 +6,26 @@ says what changed since the last run.
 
 [![CI](https://github.com/Mohanad49/testpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohanad49/testpulse/actions/workflows/ci.yml)
 
-**[Live dashboard →](https://testpulse-eight.vercel.app)** — real runs from five
-nightly CI schedules, exported as a static snapshot. Read the
+**[Live dashboard →](https://testpulse-eight.vercel.app)** — real runs, exported
+as a static snapshot. Read the
 [flakiness leaderboard](https://testpulse-eight.vercel.app/suites/testpulse-dashboard-e2e/flaky)
 first; it is the point of the whole project.
+
+The data comes from seven suites across five repositories, each on its own
+nightly schedule, all reporting through the composite action below:
+
+| Suite | Source | Stack |
+|---|---|---|
+| `testpulse-core` · `testpulse-api` · `testpulse-dashboard-e2e` | this repo | pytest, Playwright |
+| `orangehrm-e2e` | [orangehrm-playwright](https://github.com/Mohanad49/orangehrm-playwright) | Playwright/TypeScript |
+| `saucedemo-selenium` | [open-source-webapp-qa-portfolio](https://github.com/Mohanad49/open-source-webapp-qa-portfolio) | Selenium/pytest |
+| `github-api` | [github-api-tests](https://github.com/Mohanad49/github-api-tests) | requests/pytest |
+| `restful-booker-api` | [api-testing-framework-ci](https://github.com/Mohanad49/api-testing-framework-ci) | Postman/Newman |
+
+Three of those schedules also run the same commit three times a night. That is
+not redundancy — it is the only way to generate the same-commit disagreements
+the strongest flake strategy reads, and a push-triggered suite never produces
+any.
 
 ---
 

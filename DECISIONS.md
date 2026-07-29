@@ -1120,3 +1120,92 @@ to tell whether the person who wrote it understood any of it.
 - Ingest keys have no scope: one key can write to any suite. Fine for one team,
   wrong the moment two share an instance.
 - No `testpulse-core` release on PyPI, so the action installs from git.
+
+---
+
+## After Phase 6 — what the final pass turned up
+
+Two problems, both found by checking claims against reality rather than by
+running tests. Everything was green when I found them.
+
+### The dashboard was not showing what I said it was showing
+
+The README said the dashboard carried "real runs from five nightly CI
+schedules." Five nightly schedules did exist — I had checked that, and ticked it
+off. But the dashboard held three suites, and all three were TestPulse's own.
+None of the other four repositories had ever written a row.
+
+The claim and the fact were adjacent enough that verifying the wrong one felt
+like verifying the right one. Five schedules produced test results; nothing
+carried those results into TestPulse. I had built the ingest action, documented
+it in the README, and then never pointed a single external suite at it.
+
+The fix was to make the sentence true rather than to soften it: all four other
+repositories now ingest through the composite action this repo publishes.
+Sub-decisions worth recording:
+
+- **`always()`, not on success.** A failing run is the data point that matters
+  most. Ingesting only green runs would produce a flake history that has never
+  seen a failure, which is worse than no history because it looks fine.
+- **`continue-on-error: true` on every ingest step.** Observability must never
+  be the thing that breaks the suite it is observing. If Neon is unreachable at
+  2am, those suites still report their own results normally and TestPulse
+  quietly misses a night.
+- **Not on pull requests**, matching what this repo's own CI already did. Branch
+  runs would pollute the history with code that may never merge.
+- **The qa-portfolio cron moved 06:00 → 02:00.** The export runs at 03:00, so at
+  06:00 that suite's results were always a full day stale before anyone saw them.
+
+The side effect I like most: the action is now genuinely used by four
+independent suites rather than documented and unused. It also immediately
+justified the composite-action choice from Phase 5 — those repos are Node,
+Python and Newman, and a Docker action would have been wrong for at least one.
+
+**Rejected:** editing the README down to "runs from this repository's own CI."
+Accurate, trivial, and it would have thrown away the entire multi-repo story for
+about ten minutes of work saved. The claim was worth making true.
+
+### The nightly schedules were going to switch themselves off
+
+GitHub disables scheduled workflows after 60 days without repository activity,
+and **only new commits reset that timer**. Not workflow runs. Not releases, tags,
+issues or pull requests.
+
+Four of these five repositories are finished. Nobody is going to commit to them
+again. So roughly two months from the last push, every nightly schedule would
+have stopped — silently, with no failed run and no email, and the dashboard
+would have quietly frozen while continuing to look completely healthy. A stale
+dashboard that presents itself as current is worse than an obviously broken one.
+
+Each repository now has a monthly `keepalive` workflow that makes an empty
+commit, but only if the repository has actually been quiet for 45 days. In
+normal use it never commits at all; the 45-day threshold leaves a full extra
+monthly run of margin inside the 60-day window.
+
+Two things I checked rather than assumed:
+
+- All five repositories default `GITHUB_TOKEN` to read-only. I did not know
+  whether a workflow-level `permissions: contents: write` could escalate past
+  that, and the failure mode is a job that works today and cannot push on the
+  one day in 45 that it needs to. So the workflow takes a `force` input that
+  runs the real push path on demand. It escalates fine — verified by running it,
+  not by reading about it. A safety net that cannot be tested before the day it
+  matters is not a safety net.
+- Commits made with `GITHUB_TOKEN` deliberately do not trigger workflows, so the
+  keepalive cannot set off a build loop.
+
+**Rejected:** the popular marketplace keepalive action. Twenty lines of shell I
+can read beats a third-party dependency with write access to five repositories,
+particularly in a project whose entire argument is that you should be able to
+tell whether a green check means anything.
+
+**Also considered and rejected:** just documenting it as a known maintenance
+task. A note in a README does not survive eighteen months of not thinking about
+this repository, which is exactly the timescale where the problem occurs.
+
+### Storage, checked while I was at it
+
+About 306 results a night across the suites, roughly 43 MB a year with index
+overhead, against Neon's 512 MB free tier. Something like twelve years. There is
+no pruning and it does not need any yet; when it does, the retention policy is a
+real decision and not one to make preemptively against a number this far away.
