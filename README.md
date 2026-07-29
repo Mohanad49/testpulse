@@ -234,18 +234,28 @@ alternative rejected and what it costs. It also records what I got wrong:
 
 ## Deployment
 
-`fly.toml` (API, scale-to-zero + managed Postgres) and `vercel.json` (dashboard,
-proxying `/api` to the same origin — same paths in dev, Docker and production, so
-there is no CORS configuration anywhere).
+The public demo has **no application server**. CI writes real runs to a free Neon
+Postgres, `testpulse export` dumps the exact shapes the API returns into JSON, and
+Vercel serves those files as a static site.
 
-`POST /api/ingest` requires `Authorization: Bearer <key>` when
-`TESTPULSE_INGEST_KEYS` is set, and **the app refuses to boot** when
-`TESTPULSE_ENV=production` and no key is configured. Reads stay open — the
-dashboard's whole purpose is being linkable.
+That is a deliberate trade, not a shortcut. Every free app host either sleeps
+between requests — a ~50 second cold start on the one visit that matters — or
+withdraws its free tier eventually. A file on a CDN does neither. The cost is
+liveness: the demo is as fresh as the last nightly run, and the dashboard says so
+in a banner rather than letting anyone assume otherwise.
 
-> **Not currently deployed.** The configs are written and the auth gap is closed,
-> but no live instance exists yet, so there is no demo link on this page. I would
-> rather have no link than one pointing at nothing.
+The API is not vestigial: it is what a self-hosted install runs, it is fully
+tested, and the exporter is a second consumer of the same query layer.
+
+```bash
+testpulse export --output packages/testpulse-web/public/data
+VITE_DATA_MODE=static pnpm build
+```
+
+For a self-hosted instance, `POST /api/ingest` requires
+`Authorization: Bearer <key>` when `TESTPULSE_INGEST_KEYS` is set, and the app
+**refuses to boot** under `TESTPULSE_ENV=production` with no key configured.
+Reads stay open — the dashboard's whole purpose is being linkable.
 
 ## What I would build next
 

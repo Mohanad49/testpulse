@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { staticApi } from "./static";
 import type {
   FailureCluster,
   PagedTests,
@@ -43,7 +44,14 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 const encodeSuite = encodeURIComponent;
 
-export const api = {
+/**
+ * Static mode serves the dashboard from exported JSON rather than a live API.
+ * Set at build time so the deployed demo needs no server at all, while a
+ * self-hosted install keeps talking to the real thing.
+ */
+export const IS_STATIC = import.meta.env.VITE_DATA_MODE === "static";
+
+const liveApi = {
   suites: (signal?: AbortSignal) => get<Suite[]>("/api/suites", signal),
 
   health: (suite: string, signal?: AbortSignal) =>
@@ -86,6 +94,8 @@ export const api = {
   quarantine: (suite: string, signal?: AbortSignal) =>
     get<QuarantineList>(`/api/suites/${encodeSuite(suite)}/quarantine`, signal),
 };
+
+export const api = IS_STATIC ? staticApi : liveApi;
 
 export interface AsyncState<T> {
   data: T | null;

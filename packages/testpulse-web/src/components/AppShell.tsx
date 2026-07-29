@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import type { Suite } from "../api/types";
+import { IS_STATIC } from "../api/client";
 
 const THEME_KEY = "testpulse-theme";
 type Theme = "dark" | "light";
@@ -134,6 +135,20 @@ export function AppShell({ suites, suite, onSuiteChange, children }: Props) {
           </div>
         </div>
       </header>
+
+      {IS_STATIC && (
+        /* Said plainly rather than hidden in a footer. Someone looking at this
+           should know they are seeing a nightly snapshot of real runs, not a
+           live service - claiming otherwise would be the kind of small
+           dishonesty that undermines everything else on the page. */
+        <p
+          className="border-b px-4 py-1.5 text-center text-xs"
+          style={{ backgroundColor: "var(--bg-subtle)", color: "var(--fg-muted)", borderColor: "var(--border)" }}
+        >
+          Static demo — real test runs from CI, exported nightly. The live API and
+          ingest endpoint run in a self-hosted install.
+        </p>
+      )}
 
       <main id="main" className="mx-auto max-w-[1400px] px-4 py-5">
         {children}

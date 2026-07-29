@@ -1032,22 +1032,64 @@ authenticated; the CLI cannot target it yet.
 That is recorded as the top item in "what I would build next" rather than quietly
 left. It is the most security-relevant known gap in the project.
 
-### Fly for the API, Vercel for the dashboard
+### Fly was the wrong call, and I had the facts wrong
 
-Fly because scale-to-zero with a managed Postgres is free-tier viable, and a
-portfolio demo that costs money every month is a portfolio demo that gets
-switched off in six weeks. `min_machines_running = 0` and the first request after
-a suspend pays a cold start, which is the correct trade for something nobody is
-paying for.
+I wrote a `fly.toml` and described Fly as "free-tier viable". It is not. Fly
+removed its permanent free allowances in 2024; a new account gets $5 of trial
+credit, requires a card, and bills from then on — a small always-on machine lands
+somewhere between $2 and $25 a month depending on traffic.
 
-Migrations run as a `release_command`, before new machines take traffic — the
-same reasoning as the compose setup. An app that migrates in its entrypoint
-cannot be scaled and two instances racing to migrate is a bug waiting.
+I should have checked before recommending it rather than after. The config is
+deleted, and what replaced it is better anyway (below).
 
-Vercel rewrites `/api` to the Fly app, so the dashboard talks to a same-origin
-path. That is now true in three environments — Vite dev proxy, nginx in Docker,
-Vercel rewrite — which means one set of paths and **no CORS configuration
-anywhere**. Worth the small duplication.
+### The public demo is a static snapshot, and there is no server at all
+
+Every genuinely free application host does one of two things: sleeps between
+requests, or eventually withdraws its free tier. The first is fatal for a
+portfolio — a recruiter opens the link and watches a blank page for fifty seconds
+while a container cold-starts. The second is fatal more slowly: the link works
+today and is dead when it matters.
+
+So the deployed demo has no application server. CI writes real runs to Postgres,
+then `testpulse export` dumps the exact shapes the API returns into JSON, and
+Vercel serves those files. Cost is zero permanently, first paint is a CDN hit,
+and there is nothing that can be suspended.
+
+The data is not faked to achieve this. It is the same query layer, the same
+metrics, the same real runs from five nightly CI schedules. What is lost is
+liveness — the snapshot is as fresh as the last nightly run — and the ingest
+endpoint, which a public demo should not expose anyway.
+
+**The dashboard says so on the page.** A banner states it is a nightly snapshot
+of real runs and that the live API runs in a self-hosted install. Letting someone
+believe they are poking a live service would be a small dishonesty, and small
+dishonesties are exactly what a reviewer notices.
+
+One file per suite rather than one per endpoint. The whole dashboard for a suite
+becomes a single request, and — the deciding reason — per-test files would need
+filenames derived from `test_id`, which contains slashes, spaces and parentheses.
+Encoding that safely is a problem with no good answer, and this shape does not
+have the problem.
+
+The static client re-sorts rather than trusting the file's order, because the
+dashboard offers several sorts and a file can only be written in one. Nulls sort
+last in both directions, matching the API exactly.
+
+### Neon for the database
+
+Permanent free tier, no credit card, scale-to-zero, and plain Postgres so the
+existing connection string and Alembic migrations work unchanged. The workload is
+a handful of writes a night and one read during the export, which is nowhere near
+any free limit.
+
+Supabase would also have worked. Neon wins on being just a database — Supabase
+brings auth, storage and realtime that this project has no use for.
+
+### CI deploys, not Vercel's git integration
+
+A Vercel build triggered by the push would run *before* the tests, before the
+ingest, and before the export — so it would publish yesterday's snapshot every
+time. The deploy has to happen after the data exists, which means CI drives it.
 
 ### Nothing is actually deployed, and the README says so
 

@@ -4,3 +4,4 @@ dist/
 test-results/
 playwright-report*
 junit-results.xml
+public/data/

@@ -15,6 +15,7 @@ import typer
 
 from testpulse_core import quarantine as quarantine_service
 from testpulse_core.config import get_settings
+from testpulse_core.export import export_all
 from testpulse_core.metrics import TestMetrics
 from testpulse_core.models import RunMetadata
 from testpulse_core.parsers import (
@@ -276,6 +277,41 @@ def flaky(
     typer.echo(f"\n{len(found)} flaky test(s).")
     if fail_on_flaky:
         raise typer.Exit(EXIT_FLAKY_FOUND)
+
+
+@app.command("export")
+def export_static(
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Directory to write index.json and the suite files into."),
+    ],
+    database_url: Annotated[str | None, typer.Option("--database-url")] = None,
+) -> None:
+    """Dump every suite as static JSON for a serverless dashboard.
+
+    The dashboard can read these instead of calling the API, which is what makes
+    a permanently free public demo possible: every free application host either
+    sleeps between requests or eventually withdraws its free tier, and a file on
+    a CDN does neither.
+    """
+    settings = get_settings()
+    engine = create_db_engine(database_url)
+    try:
+        with session_scope(engine) as session:
+            written = export_all(session, output, settings)
+    finally:
+        engine.dispose()
+
+    if not written:
+        # Not an error: a fresh database legitimately has nothing. But a silent
+        # success here produces an empty dashboard that looks broken, so say it.
+        typer.secho(
+            "No suites found, so only index.json was written. The dashboard will "
+            "show its empty state.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+    typer.echo(f"Exported {len(written)} suite(s) to {output}")
 
 
 @app.command()

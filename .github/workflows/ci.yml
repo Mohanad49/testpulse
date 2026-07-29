@@ -213,6 +213,27 @@ jobs:
             --suite testpulse-core \
             --commit "$GITHUB_SHA" --branch main --env python-ci || true
 
+      - name: Export a static snapshot for the public dashboard
+        env:
+          TESTPULSE_DATABASE_URL: ${{ secrets.TESTPULSE_DATABASE_URL || format('sqlite:///{0}/self.db', github.workspace) }}
+        run: uv run testpulse export --output packages/testpulse-web/public/data
+
+      - name: Publish the dashboard
+        # Deployed from CI rather than from a Vercel git integration, because the
+        # snapshot has to be generated *after* this run's results are ingested.
+        # A build triggered by the push would run before any of that existed.
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_DATA_MODE: static
+        working-directory: packages/testpulse-web
+        run: |
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
       - name: Summarise
         env:
           TESTPULSE_DATABASE_URL: ${{ secrets.TESTPULSE_DATABASE_URL || format('sqlite:///{0}/self.db', github.workspace) }}
