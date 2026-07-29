@@ -6,6 +6,11 @@ says what changed since the last run.
 
 [![CI](https://github.com/Mohanad49/testpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohanad49/testpulse/actions/workflows/ci.yml)
 
+**[Live dashboard →](https://testpulse-eight.vercel.app)** — real runs from five
+nightly CI schedules, exported as a static snapshot. Read the
+[flakiness leaderboard](https://testpulse-eight.vercel.app/suites/testpulse-dashboard-e2e/flaky)
+first; it is the point of the whole project.
+
 ---
 
 ## The problem
