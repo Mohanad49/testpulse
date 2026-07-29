@@ -225,15 +225,44 @@ jobs:
           if [ -z "${{ secrets.TESTPULSE_DATABASE_URL }}" ]; then
             echo "::warning::No TESTPULSE_DATABASE_URL secret set. Ingesting into a throwaway runner-local database, so no history accumulates."
           fi
-          uv run testpulse ingest --format playwright \
+          # Exit 3 is "already ingested", which is the correct outcome when a
+          # job is re-run and must not fail the build. Anything else is real.
+          #
+          # This replaces a blanket `|| true`, which hid a genuine bug: the
+          # JUnit path was wrong and the step reported success while silently
+          # ingesting nothing. Swallowing every exit code is the same mistake
+          # this whole project exists to argue against.
+          ingest() {
+            set +e
+            uv run testpulse ingest "$@"
+            local code=$?
+            set -e
+            if [ $code -eq 3 ]; then
+              echo "::notice::Already ingested, continuing."
+            elif [ $code -ne 0 ]; then
+              echo "::error::Ingest failed with exit $code"
+              return $code
+            fi
+          }
+
+          ingest --format playwright \
             --path e2e-results/playwright-report.json \
             --suite testpulse-dashboard-e2e \
             --commit "$GITHUB_SHA" --branch main --env chromium-ci \
-            --ci-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
-          uv run testpulse ingest --format junit \
-            --path backend-results/junit-core.xml \
+            --ci-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          # upload-artifact preserves paths relative to the common ancestor of
+          # everything it was given, so the three backend files arrive under
+          # their package directories rather than flat.
+          ingest --format junit \
+            --path backend-results/testpulse-core/junit-core.xml \
             --suite testpulse-core \
-            --commit "$GITHUB_SHA" --branch main --env python-ci || true
+            --commit "$GITHUB_SHA" --branch main --env python-ci
+
+          ingest --format junit \
+            --path backend-results/testpulse-api/junit-api.xml \
+            --suite testpulse-api \
+            --commit "$GITHUB_SHA" --branch main --env python-ci
 
       - name: Export a static snapshot for the public dashboard
         env:
