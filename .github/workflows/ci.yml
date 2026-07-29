@@ -193,6 +193,19 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen --all-extras
 
+      # This job publishes the dashboard, which means it builds it, which means
+      # it needs node and pnpm. The other jobs set these up and this one did not
+      # - `npx vercel` worked because node is preinstalled on the runner, then
+      # the Vercel CLI shelled out to `pnpm build` and got "pnpm: not found".
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: packages/testpulse-web/pnpm-lock.yaml
+
       - name: Migrate the database
         # Run here rather than left as a step somebody has to remember. A schema
         # change that ships without its migration fails at ingest time, at 3am,
