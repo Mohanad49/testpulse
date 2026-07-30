@@ -78,7 +78,19 @@ runs:
 
     - name: Install TestPulse
       shell: bash
-      run: pipx install "testpulse-core @ git+https://github.com/Mohanad49/testpulse@main#subdirectory=packages/testpulse-core"
+      # The [postgres] extra, unconditionally.
+      #
+      # testpulse-core deliberately keeps the compiled Postgres driver out of the
+      # base install because most *local CLI* use is SQLite. This action is the
+      # exact inverse: anyone passing a database-url in CI is almost certainly
+      # pointing at a shared Postgres, and without the extra every ingest dies on
+      # ModuleNotFoundError: No module named 'psycopg'.
+      #
+      # Installing it conditionally on the URL scheme was the tidier option and
+      # the wrong one - a bug in that conditional would fail exactly the way this
+      # already failed once: silently, and only in production. A ~3 second wheel
+      # install is the cheaper trade.
+      run: pipx install "testpulse-core[postgres] @ git+https://github.com/Mohanad49/testpulse@main#subdirectory=packages/testpulse-core"
 
     - name: Prepare database
       shell: bash
@@ -112,6 +124,27 @@ runs:
         if [ $CODE -eq 3 ]; then
           echo "::notice::This run was already ingested. Continuing."
         elif [ $CODE -ne 0 ]; then
+          # An ::error:: annotation as well as the non-zero exit, because callers
+          # are told to wrap this step in continue-on-error so that a database
+          # outage cannot redden the suite being observed. That is still the
+          # right call - but it converts the step's conclusion to "success", and
+          # a failed ingest then looks identical to a working one.
+          #
+          # This is not hypothetical. Every external suite ingested into nothing
+          # for a full night, 16 jobs reported success, and the only evidence was
+          # a traceback buried in a 2,600-line log. Annotations survive
+          # continue-on-error and show up on the run summary, so the failure is
+          # visible without being fatal.
+          echo "::error::TestPulse ingest failed with exit ${CODE} for suite '${{ inputs.suite }}'. No results were recorded. See the step log."
+          {
+            echo "### TestPulse ingest failed"
+            echo ""
+            echo "Suite \`${{ inputs.suite }}\` recorded **nothing** this run (exit ${CODE})."
+            echo ""
+            echo '```'
+            echo "$OUTPUT" | tail -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit $CODE
         fi
 
