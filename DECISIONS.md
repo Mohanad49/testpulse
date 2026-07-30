@@ -1209,3 +1209,49 @@ About 306 results a night across the suites, roughly 43 MB a year with index
 overhead, against Neon's 512 MB free tier. Something like twelve years. There is
 no pruning and it does not need any yet; when it does, the retention policy is a
 real decision and not one to make preemptively against a number this far away.
+
+### The action shipped a green check that meant nothing
+
+The night after wiring the four external repos in, every one of them ingested
+absolutely nothing. Sixteen jobs reported success. The dashboard sat at three
+suites. There was no failed run, no annotation, and no email.
+
+The cause was one line. `testpulse-core` deliberately keeps the compiled
+Postgres driver behind a `[postgres]` extra, on the reasoning that most local
+CLI use is SQLite and shipping a compiled driver to people who will never open a
+Postgres connection is a cost with no benefit. I still think that is right for
+the library. But the action is the exact inverse case — anyone passing a
+`database-url` in CI is pointing at a shared Postgres — and it installed the
+base package. Every ingest died on `ModuleNotFoundError: No module named
+'psycopg'`.
+
+This repo's own CI never caught it because it installs with `uv sync
+--all-extras`. The action's install path was the one path nothing exercised
+against a real Postgres, and it was the only path the external repos used.
+
+The second half is the part worth keeping. The action already exited non-zero.
+What hid it was my own instruction to callers to wrap the step in
+`continue-on-error`, so that a database outage could never redden the suite
+being observed. I still believe that is correct — observability must not break
+the thing it observes — but `continue-on-error` rewrites the step's conclusion
+to success, and a crashed ingest becomes indistinguishable from a working one.
+The only evidence was a traceback buried in a 2,600-line log.
+
+So the action now also emits an `::error::` annotation and writes to the step
+summary. Both survive `continue-on-error`, which means the failure is loud
+without being fatal — visible and non-blocking, rather than one or the other.
+
+I am recording this at length because of what it is. This project's entire
+argument is that a green check should mean something, and that a suite which
+cannot fail is not evidence. I shipped a step that could not fail. The tool
+would have caught this instantly if anything had been watching the tool.
+
+**Rejected:** installing the extra conditionally on the URL scheme. Tidier, and
+wrong — a bug in that conditional fails in exactly the way this already failed
+once, silently and only in production. Three seconds of wheel install is the
+cheaper trade.
+
+**What I would change structurally:** the action's install path needs a smoke
+test against a real Postgres. Nothing in CI currently runs `testpulse ingest`
+the way the action runs it. That is the actual gap; the missing extra was just
+the first thing to fall through it.
